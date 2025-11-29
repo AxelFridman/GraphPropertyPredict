@@ -1,0 +1,44 @@
+seed: 42
+device: auto
+
+task:
+  name: bipartite
+  mode: binary
+
+dataset:
+  cache_path: data/cache/bipartite_n32_50k.pt
+  num_graphs: 50000
+  n_nodes: 32
+  balance_binary: true
+  sources:
+    - family: erdos_renyi
+      params: {p: 0.10}
+      weight: 0.5
+    - family: watts_strogatz
+      params: {k: 4, p: 0.20}
+      weight: 0.5
+  transforms:
+    - name: random_node_permutation
+      params: {p: 1.0}
+    - name: pad_to_size
+      params: {size: 32}
+    - name: to_float_tensor
+      params: {}
+
+split: {train: 0.80, val: 0.10, test: 0.10}
+dataloader: {batch_size: 128, num_workers: 0}
+
+model:
+  name: adj_cnn
+  params:
+    channels: [32, 64, 128]
+    hidden_dim: 256
+    dropout: 0.2
+
+optim: {name: adamw, lr: 0.001, weight_decay: 0.0001}
+trainer:
+  epochs: 20
+  grad_clip: 1.0
+  log_every: 100
+  out_dir: runs/bipartite_adjcnn
+  metric_for_best: val/accuracy

@@ -1,0 +1,44 @@
+seed: 7
+device: auto
+
+task:
+  name: max_clique
+  mode: regression
+
+dataset:
+  cache_path: data/cache/maxclique_n18_30k.pt
+  num_graphs: 30000
+  n_nodes: 18
+  balance_binary: false
+  sources:
+    - family: erdos_renyi
+      params: {p: 0.20}
+      weight: 0.7
+    - family: barabasi_albert
+      params: {m: 3}
+      weight: 0.3
+  transforms:
+    - name: random_node_permutation
+      params: {p: 1.0}
+    - name: pad_to_size
+      params: {size: 18}
+    - name: to_float_tensor
+      params: {}
+
+split: {train: 0.80, val: 0.10, test: 0.10}
+dataloader: {batch_size: 64, num_workers: 0}
+
+model:
+  name: dense_gcn
+  params:
+    hidden_dim: 128
+    num_layers: 4
+    dropout: 0.1
+
+optim: {name: adamw, lr: 0.001, weight_decay: 0.0001}
+trainer:
+  epochs: 30
+  grad_clip: 1.0
+  log_every: 100
+  out_dir: runs/maxclique_densegcn
+  metric_for_best: val/mae
