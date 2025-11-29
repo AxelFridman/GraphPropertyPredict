@@ -4,12 +4,24 @@ version = "0.1.0"
 description = "Modular adjacency-matrix ML for graph properties"
 requires-python = ">=3.10"
 dependencies = [
-  "numpy>=1.24",
-  "torch>=2.1",
-  "networkx>=3.2",
-  "pyyaml>=6.0",
-  "tqdm>=4.66",
-  "tensorboard>=2.14",
+  # Core
+  numpy>=1.24
+  torch>=2.1
+  networkx>=3.2
+  pyyaml>=6.0
+  tqdm>=4.66
+
+  # Logging / viz
+  tensorboard>=2.14
+
+  # Optional quality-of-life (recommended)
+  rich>=13.7
+  ipython>=8.18
+
+  # Optional for exporting / deployment (only if you use them)
+  onnx>=1.15
+  onnxruntime>=1.17
+
 ]
 
 [build-system]

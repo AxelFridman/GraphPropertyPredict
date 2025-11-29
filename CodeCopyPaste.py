@@ -67,7 +67,7 @@ def display_folder_tree(tree_structure):
     return "\n".join(output)
 
 if __name__ == "__main__":
-    folder_paths = [r"C:\Users\fridm\Desktop\groupNLPExplanations\pipeline"] #input("Enter the folder path: ") #, "C:\\Users\\fridm\\Documents\\realtime_openai_api\\src"
+    folder_paths = [r"C:\Users\fridm\Desktop\GraphPropertyPredict"] #input("Enter the folder path: ") #, "C:\\Users\\fridm\\Documents\\realtime_openai_api\\src"
  #input("Enter the folder path: ")
     tree_output = ''
     for folder_path in folder_paths:

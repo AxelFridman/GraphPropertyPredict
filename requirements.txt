@@ -1,0 +1,10 @@
+numpy>=1.24
+torch>=2.1
+networkx>=3.2
+pyyaml>=6.0
+tqdm>=4.66
+tensorboard>=2.14
+rich>=13.7
+ipython>=8.18
+onnx>=1.15
+onnxruntime>=1.17
