@@ -7,16 +7,16 @@ task:
 
 dataset:
   cache_path: data/cache/bipartite_n32_50k.pt
-  num_graphs: 50000
+  num_graphs: 1000
   n_nodes: 32
   balance_binary: true
   sources:
     - family: erdos_renyi
       params: {p: 0.10}
-      weight: 0.5
+      weight: 0.9
     - family: watts_strogatz
       params: {k: 4, p: 0.20}
-      weight: 0.5
+      weight: 0.1
   transforms:
     - name: random_node_permutation
       params: {p: 1.0}
