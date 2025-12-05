@@ -1,4 +1,4 @@
-# build_ordering_coloring_dataset_with_csv_no_images_varied_graphs.py
+# build_ordering_coloring_dataset_with_csv_no_images_varied_graphs_parallel.py
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import json
 import os
 import random
 import time
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, asdict
 from itertools import permutations
 from typing import Dict, List, Tuple, Optional
@@ -35,7 +37,6 @@ def constraint_graph_for_ordering(G: nx.Graph, ordering: List[int]) -> nx.Graph:
             a, b = b, a
             ia, ib = ib, ia
 
-        # any vertex v strictly between endpoints must differ from both endpoints
         for idx in range(ia + 1, ib):
             v = ordering[idx]
             H.add_edge(v, a)
@@ -104,11 +105,9 @@ def exact_chromatic_number_dsatur(G: nx.Graph) -> Tuple[int, Dict[int, int]]:
 
         forbidden = {colors[u] for u in adj[v] if u in colors}
 
-        # try existing colors
         for c in range(1, current_max + 1):
             if c in forbidden:
                 continue
-
             colors[v] = c
             changed = []
             for u in adj[v]:
@@ -122,7 +121,6 @@ def exact_chromatic_number_dsatur(G: nx.Graph) -> Tuple[int, Dict[int, int]]:
                 neighbor_colors[u].remove(c)
             del colors[v]
 
-        # try introducing new color
         new_c = current_max + 1
         if new_c < best_k:
             colors[v] = new_c
@@ -158,7 +156,6 @@ def has_hamiltonian_path_exact(G: nx.Graph) -> bool:
     if n <= 1:
         return True
 
-    # Fast impossibility checks
     if nx.number_connected_components(G) != 1:
         return False
 
@@ -166,19 +163,16 @@ def has_hamiltonian_path_exact(G: nx.Graph) -> bool:
     if any(deg[v] == 0 for v in G.nodes()):
         return False
 
-    # In an undirected graph, >2 degree-1 vertices => impossible for Hamiltonian path
     if sum(1 for v in G.nodes() if deg[v] == 1) > 2:
         return False
 
-    # Nodes are assumed 0..n-1 (we enforce during generation)
-    # Bitmask adjacency
     adjmask = [0] * n
     for u, v in G.edges():
         adjmask[u] |= 1 << v
         adjmask[v] |= 1 << u
 
     full = (1 << n) - 1
-    dp = [0] * (1 << n)  # dp[mask] = bitset of possible endpoints for a Hamiltonian path visiting mask
+    dp = [0] * (1 << n)
 
     for i in range(n):
         dp[1 << i] = 1 << i
@@ -227,13 +221,6 @@ class GraphRecord:
     has_hamiltonian_path: bool
 
 
-def record_to_graph(rec: GraphRecord) -> nx.Graph:
-    G = nx.Graph()
-    G.add_nodes_from(range(rec.n))
-    G.add_edges_from(rec.edges)
-    return G
-
-
 # ----------------------------
 # Ordering search: exhaustive for small n, sampled for larger n
 # ----------------------------
@@ -255,7 +242,6 @@ def _bfs_ordering(G: nx.Graph, start: int) -> List[int]:
                     q.append(u)
         break
 
-    # add remaining components (disconnected case)
     for comp in nx.connected_components(G):
         if any(v in seen for v in comp):
             continue
@@ -283,13 +269,11 @@ def _dfs_ordering(G: nx.Graph, start: int) -> List[int]:
             if u not in seen:
                 dfs(u)
 
-    # first component containing start
     for comp in nx.connected_components(G):
         if start in comp:
             dfs(start)
             break
 
-    # then the rest (disconnected)
     for comp in nx.connected_components(G):
         if any(v in seen for v in comp):
             continue
@@ -301,8 +285,7 @@ def _dfs_ordering(G: nx.Graph, start: int) -> List[int]:
 
 def candidate_orderings(G: nx.Graph, rng: random.Random, max_samples: int) -> List[List[int]]:
     nodes = list(G.nodes())
-    n = len(nodes)
-    if n == 0:
+    if not nodes:
         return [[]]
 
     seen = set()
@@ -314,11 +297,9 @@ def candidate_orderings(G: nx.Graph, rng: random.Random, max_samples: int) -> Li
             seen.add(t)
             out.append(order)
 
-    # deterministic-ish heuristics
-    push(sorted(nodes, key=lambda v: G.degree(v), reverse=True))  # high degree first
-    push(sorted(nodes, key=lambda v: G.degree(v)))                # low degree first
+    push(sorted(nodes, key=lambda v: G.degree(v), reverse=True))
+    push(sorted(nodes, key=lambda v: G.degree(v)))
 
-    # core-based heuristics (gives good variety on “mesh-like” graphs)
     try:
         core = nx.core_number(G) if G.number_of_nodes() > 0 else {}
         push(sorted(nodes, key=lambda v: (core.get(v, 0), G.degree(v)), reverse=True))
@@ -326,23 +307,21 @@ def candidate_orderings(G: nx.Graph, rng: random.Random, max_samples: int) -> Li
     except nx.NetworkXError:
         pass
 
-    # component-aware: big components first, then by degree
     comps = sorted(nx.connected_components(G), key=len, reverse=True)
     comp_order: List[int] = []
     for comp in comps:
         comp_order.extend(sorted(comp, key=lambda v: G.degree(v), reverse=True))
     push(comp_order)
 
-    # BFS/DFS from different starts
-    starts = []
-    starts.append(max(nodes, key=lambda v: G.degree(v)))
-    starts.append(min(nodes, key=lambda v: G.degree(v)))
-    starts.append(rng.choice(nodes))
+    starts = [
+        max(nodes, key=lambda v: G.degree(v)),
+        min(nodes, key=lambda v: G.degree(v)),
+        rng.choice(nodes),
+    ]
     for s in starts:
         push(_bfs_ordering(G, s))
         push(_dfs_ordering(G, s))
 
-    # random permutations (true variety)
     base = nodes[:]
     while len(out) < max_samples:
         rng.shuffle(base)
@@ -369,8 +348,7 @@ def analyze_graph_orderings(
     num_opt = 0
 
     if n <= exhaustive_n_max:
-        iterable = permutations(nodes)
-        for ordering in iterable:
+        for ordering in permutations(nodes):
             total += 1
             ordering = list(ordering)
             H = constraint_graph_for_ordering(G, ordering)
@@ -420,8 +398,21 @@ def analyze_graph_orderings(
 
 
 # ----------------------------
-# Extra attributes for CSV
+# Extra attributes for CSV (+ max_clique witness)
 # ----------------------------
+
+def maximum_clique_witness(G: nx.Graph) -> List[int]:
+    """
+    Exact: enumerates maximal cliques and keeps the largest.
+    Deterministic tie-break: lexicographically smallest among max-size cliques.
+    """
+    best: List[int] = []
+    for c in nx.find_cliques(G):
+        c_sorted = sorted(c)
+        if len(c_sorted) > len(best) or (len(c_sorted) == len(best) and c_sorted < best):
+            best = c_sorted
+    return best
+
 
 def compute_graph_attributes(G: nx.Graph) -> Dict[str, object]:
     degrees = dict(G.degree())
@@ -438,19 +429,20 @@ def compute_graph_attributes(G: nx.Graph) -> Dict[str, object]:
     num_components = nx.number_connected_components(G) if G.number_of_nodes() > 0 else 0
     component_sizes = sorted((len(c) for c in nx.connected_components(G)), reverse=True)
 
-    # exact clique number via maximal cliques enumeration (OK for small n)
-    clique_number = max((len(c) for c in nx.find_cliques(G)), default=0)
+    max_clique = maximum_clique_witness(G)
+    clique_number = len(max_clique)
 
     return {
         "max_degree": max_degree,
         "avg_degree": avg_degree,
         "clique_number": clique_number,
+        "max_clique": max_clique,  # NEW
         "num_deg_ge_2": num_deg_ge_2,
         "num_deg_ge_3": num_deg_ge_3,
         "num_deg_ge_5": num_deg_ge_5,
         "num_isolated": num_isolated,
         "num_components": num_components,
-        "component_sizes": component_sizes,  # store as JSON in CSV
+        "component_sizes": component_sizes,
         "density": nx.density(G) if G.number_of_nodes() > 1 else 0.0,
     }
 
@@ -470,6 +462,20 @@ def _rand_even_k(rng: random.Random, n: int, k_min: int = 2) -> int:
     if k % 2 == 1:
         k = max(k_min, k - 1)
     return min(k, n - 1)
+
+
+def _random_tree_compat(n: int, seed: int) -> nx.Graph:
+    """
+    NetworkX 3.4+: nx.random_labeled_tree
+    Older: attempt import from generators
+    """
+    if hasattr(nx, "random_labeled_tree"):
+        return nx.random_labeled_tree(n, seed=seed)
+    try:
+        from networkx.generators.trees import random_labeled_tree
+        return random_labeled_tree(n, seed=seed)
+    except Exception as e:
+        raise RuntimeError("No random labeled tree generator found in your NetworkX.") from e
 
 
 def _combine_with_bridges(
@@ -516,7 +522,6 @@ def _force_connected(G: nx.Graph, rng: random.Random) -> nx.Graph:
         return _ensure_int_labels(G)
 
     comps = [list(c) for c in nx.connected_components(G)]
-    # connect components with random bridge edges (keeps "bridge-y" nature)
     for i in range(len(comps) - 1):
         u = rng.choice(comps[i])
         v = rng.choice(comps[i + 1])
@@ -531,7 +536,6 @@ def _force_disconnected(G: nx.Graph, rng: random.Random) -> nx.Graph:
     if nx.number_connected_components(G) >= 2:
         return _ensure_int_labels(G)
 
-    # cut by partition: remove all crossing edges between S and V\S
     nodes = list(G.nodes())
     k = rng.randint(1, n - 1)
     rng.shuffle(nodes)
@@ -539,7 +543,6 @@ def _force_disconnected(G: nx.Graph, rng: random.Random) -> nx.Graph:
     cut_edges = [(u, v) for (u, v) in G.edges() if (u in S) ^ (v in S)]
     G.remove_edges_from(cut_edges)
 
-    # if still connected (rare), nuke a random spanning edge
     if nx.number_connected_components(G) == 1 and G.number_of_edges() > 0:
         u, v = rng.choice(list(G.edges()))
         G.remove_edge(u, v)
@@ -553,29 +556,21 @@ def generate_varied_graph(
     seed: int,
     n_min: int,
     n_max: int,
-    connectivity: str = "mixed",   # "mixed" | "all_connected" | "all_disconnected"
+    connectivity: str = "mixed",
     _depth: int = 0,
     max_depth: int = 3,
 ) -> nx.Graph:
     base_seed = (seed * 1_000_003 + gid) % (2**32)
     rng = random.Random(base_seed)
 
-    # heavy-tail-ish size: muchos chicos, algunos grandes
     if rng.random() < 0.72:
         n = rng.randint(n_min, max(n_min, (n_min + n_max) // 2))
     else:
         n = rng.randint(max(n_min, (n_min + n_max) // 2), n_max)
     n = max(1, n)
 
-    # base cases para n pequeño (evita rangos inválidos en recetas)
     if n == 1:
-        G = nx.empty_graph(1)
-        G = _ensure_int_labels(nx.Graph(G))
-        if connectivity == "all_disconnected":
-            return G
-        if connectivity == "all_connected":
-            return G
-        return G
+        return _ensure_int_labels(nx.empty_graph(1))
 
     recipes = [
         ("empty", 0.06),
@@ -598,7 +593,6 @@ def generate_varied_graph(
         ("bridge_combo", 0.10),
     ]
 
-    # evita recursión “en cadena” (bridge_combo -> disjoint_union -> bridge_combo -> ...)
     if _depth >= max_depth:
         recipes = [(t, w) for (t, w) in recipes if t not in ("disjoint_union", "bridge_combo")]
 
@@ -618,16 +612,14 @@ def generate_varied_graph(
         G = nx.path_graph(n)
 
     elif tag == "cycle":
-        if n < 3:
-            G = nx.path_graph(n)
-        else:
-            G = nx.cycle_graph(n)
+        G = nx.path_graph(n) if n < 3 else nx.cycle_graph(n)
 
     elif tag == "star":
-        G = nx.star_graph(n - 1)  # total n nodes
+        G = nx.star_graph(n - 1)
 
     elif tag == "tree":
-        G = nx.random_tree(n, seed=rand_seed())
+        # FIX for NetworkX 3.4+: use random_labeled_tree
+        G = _random_tree_compat(n, seed=rand_seed())
 
     elif tag == "erdos_sparse":
         p = rng.uniform(0.02, min(0.18, 1.0))
@@ -715,7 +707,6 @@ def generate_varied_graph(
             G = nx.lollipop_graph(c, p)
 
     elif tag == "disjoint_union":
-        # FIX: si n<2 no se puede pedir randint(2, ...)
         if n < 2:
             G = nx.empty_graph(n)
         else:
@@ -726,7 +717,6 @@ def generate_varied_graph(
 
             comps: List[nx.Graph] = []
             for s in sizes:
-                # genera EXACTAMENTE s nodos para que el total sea n
                 comps.append(
                     generate_varied_graph(
                         rand_seed(),
@@ -747,7 +737,6 @@ def generate_varied_graph(
             path_len = rng.choice([0, 0, 1, 2, 3])
             bridges = rng.choice([1, 1, 1, 2, 3])
 
-            # reservar nodos para el camino puente (si lo hay)
             n_rem = max(2, n - path_len)
             n1 = rng.randint(1, n_rem - 1)
             n2 = max(1, n_rem - n1)
@@ -775,7 +764,6 @@ def generate_varied_graph(
 
     G = _ensure_int_labels(nx.Graph(G))
 
-    # connectivity target
     if connectivity == "all_connected":
         G = _force_connected(G, rng)
     elif connectivity == "all_disconnected":
@@ -802,31 +790,51 @@ def count_jsonl_rows(path: str) -> int:
 
 
 # ----------------------------
-# Build everything: JSONL + CSV (PROGRESSIVE + RESUMABLE)
+# Parallel worker (must be top-level for Windows pickling)
 # ----------------------------
 
-def build_dataset(
+def _compute_one_graph(args: Tuple[int, int, int, int, str, int, int]) -> Tuple[dict, dict]:
+    gid, seed, n_min, n_max, connectivity, exhaustive_n_max, sampled_orderings = args
+    base_seed = (seed * 1_000_003 + gid) % (2**32)
+
+    G = generate_varied_graph(
+        gid,
+        seed=seed,
+        n_min=n_min,
+        n_max=n_max,
+        connectivity=connectivity,
+    )
+    G = _ensure_int_labels(G)
+
+    rec = analyze_graph_orderings(
+        G,
+        graph_id=gid,
+        exhaustive_n_max=exhaustive_n_max,
+        sampled_orderings=sampled_orderings,
+        ordering_seed=(base_seed ^ 0xC0FFEE),
+    )
+    attrs = compute_graph_attributes(G)
+    return asdict(rec), attrs
+
+
+# ----------------------------
+# Build everything: JSONL + CSV (PARALLEL + RESUMABLE)
+# ----------------------------
+
+def build_dataset_parallel(
     out_dir: str = "out_dataset",
     num_graphs: int = 10_000,
     seed: int = 123,
     n_min: int = 4,
     n_max: int = 12,
-    connectivity: str = "mixed",  # "mixed"|"all_connected"|"all_disconnected"
+    connectivity: str = "mixed",
     exhaustive_n_max: int = 8,
     sampled_orderings: int = 512,
     resume: bool = True,
-    flush_every: int = 25,
+    flush_every: int = 50,
+    workers: Optional[int] = None,
+    chunksize: int = 25,
 ) -> Tuple[str, str]:
-    """
-    Creates (progressively):
-      - out_dataset/ordering_dataset.jsonl   (append-only)
-      - out_dataset/ordering_dataset.csv     (append-only)
-
-    Notes:
-      - Best ordering search is exhaustive only if n <= exhaustive_n_max.
-        For larger graphs it samples `sampled_orderings` candidate orderings.
-      - Hamiltonian path is exact DP (bitmask); keep n_max reasonable for speed.
-    """
     os.makedirs(out_dir, exist_ok=True)
 
     jsonl_path = os.path.join(out_dir, "ordering_dataset.jsonl")
@@ -842,122 +850,103 @@ def build_dataset(
         "best_k", "best_ordering", "best_coloring",
         "num_orderings", "num_optimal_orderings",
         "has_hamiltonian_path",
-        "max_degree", "avg_degree", "clique_number",
+        "max_degree", "avg_degree", "clique_number", "max_clique",  # NEW
         "num_deg_ge_2", "num_deg_ge_3", "num_deg_ge_5",
         "num_isolated", "num_components", "component_sizes",
         "density",
     ]
 
     csv_exists = os.path.exists(csv_path) and os.path.getsize(csv_path) > 0
+    if workers is None:
+        workers = max(1, (os.cpu_count() or 2) - 1)
+
+    gids = list(range(start_gid, num_graphs))
+    task_args = [(gid, seed, n_min, n_max, connectivity, exhaustive_n_max, sampled_orderings) for gid in gids]
 
     with open(jsonl_path, "a", encoding="utf-8") as jf, open(csv_path, "a", newline="", encoding="utf-8") as cf:
         writer = csv.DictWriter(cf, fieldnames=fieldnames)
-
         if not csv_exists:
             writer.writeheader()
             cf.flush()
 
-        gids = range(start_gid, num_graphs)
-        iterator = tqdm(gids, total=num_graphs, initial=start_gid, dynamic_ncols=True) if tqdm else gids
-
+        pbar = tqdm(total=num_graphs, initial=start_gid, dynamic_ncols=True) if tqdm else None
         t0 = time.perf_counter()
         done = 0
 
-        for gid in iterator:
-            t_graph_start = time.perf_counter()
-            base_seed = (seed * 1_000_003 + gid) % (2**32)
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            for payload, attrs in ex.map(_compute_one_graph, task_args, chunksize=chunksize):
+                jf.write(json.dumps(payload) + "\n")
 
-            G = generate_varied_graph(
-                gid,
-                seed=seed,
-                n_min=n_min,
-                n_max=n_max,
-                connectivity=connectivity,
-            )
-            G = _ensure_int_labels(G)
+                row = {
+                    "graph_id": payload["graph_id"],
+                    "n": payload["n"],
+                    "m": payload["m"],
+                    "edges": json.dumps(payload["edges"]),
 
-            rec = analyze_graph_orderings(
-                G,
-                graph_id=gid,
-                exhaustive_n_max=exhaustive_n_max,
-                sampled_orderings=sampled_orderings,
-                ordering_seed=(base_seed ^ 0xC0FFEE),
-            )
-            attrs = compute_graph_attributes(G)
+                    "best_k": payload["best_k"],
+                    "best_ordering": json.dumps(payload["best_ordering"]),
+                    "best_coloring": json.dumps(payload["best_coloring"]),
 
-            # JSONL row
-            jf.write(json.dumps(asdict(rec)) + "\n")
+                    "num_orderings": payload["num_orderings"],
+                    "num_optimal_orderings": payload["num_optimal_orderings"],
 
-            # CSV row
-            row = {
-                "graph_id": rec.graph_id,
-                "n": rec.n,
-                "m": rec.m,
-                "edges": json.dumps(rec.edges),
+                    "has_hamiltonian_path": int(bool(payload["has_hamiltonian_path"])),
 
-                "best_k": rec.best_k,
-                "best_ordering": json.dumps(rec.best_ordering),
-                "best_coloring": json.dumps(rec.best_coloring),
+                    "max_degree": attrs["max_degree"],
+                    "avg_degree": attrs["avg_degree"],
+                    "clique_number": attrs["clique_number"],
+                    "max_clique": json.dumps(attrs["max_clique"]),  # NEW
 
-                "num_orderings": rec.num_orderings,
-                "num_optimal_orderings": rec.num_optimal_orderings,
+                    "num_deg_ge_2": attrs["num_deg_ge_2"],
+                    "num_deg_ge_3": attrs["num_deg_ge_3"],
+                    "num_deg_ge_5": attrs["num_deg_ge_5"],
+                    "num_isolated": attrs["num_isolated"],
+                    "num_components": attrs["num_components"],
+                    "component_sizes": json.dumps(attrs["component_sizes"]),
+                    "density": attrs["density"],
+                }
+                writer.writerow(row)
 
-                "has_hamiltonian_path": int(bool(rec.has_hamiltonian_path)),
+                done += 1
+                if done % flush_every == 0:
+                    jf.flush()
+                    cf.flush()
 
-                "max_degree": attrs["max_degree"],
-                "avg_degree": attrs["avg_degree"],
-                "clique_number": attrs["clique_number"],
-                "num_deg_ge_2": attrs["num_deg_ge_2"],
-                "num_deg_ge_3": attrs["num_deg_ge_3"],
-                "num_deg_ge_5": attrs["num_deg_ge_5"],
-                "num_isolated": attrs["num_isolated"],
-                "num_components": attrs["num_components"],
-                "component_sizes": json.dumps(attrs["component_sizes"]),
-                "density": attrs["density"],
-            }
-            writer.writerow(row)
+                if pbar:
+                    pbar.update(1)
+                    pbar.set_postfix({"n": payload["n"], "k": payload["best_k"]})
+                elif done % 50 == 0:
+                    elapsed = time.perf_counter() - t0
+                    print(f"done={start_gid+done}/{num_graphs} avg_sec_graph={elapsed/done:.3f}", flush=True)
 
-            done += 1
-            if done % flush_every == 0:
-                jf.flush()
-                cf.flush()
-
-            dt = time.perf_counter() - t_graph_start
-            if tqdm:
-                iterator.set_postfix({"n": rec.n, "k": rec.best_k, "sec/graph": f"{dt:.2f}"})
-            else:
-                elapsed = time.perf_counter() - t0
-                avg = elapsed / done
-                remaining = (num_graphs - (gid + 1)) * avg
-                print(
-                    f"[{gid+1}/{num_graphs}] n={rec.n} k={rec.best_k} sec/graph={dt:.2f} "
-                    f"avg={avg:.2f}s est_left={remaining:.0f}s",
-                    flush=True,
-                )
+        if pbar:
+            pbar.close()
 
     return jsonl_path, csv_path
 
 
 if __name__ == "__main__":
-    # pip install tqdm  (opcional)
-    jsonl_path, csv_path = build_dataset(
-        out_dir="out_dataset2",
+    mp.freeze_support()
+
+    jsonl_path, csv_path = build_dataset_parallel(
+        out_dir="out_datasetJust8",
         num_graphs=10_000,
-        seed=123,
+        
+        seed=786,
 
-        # variedad real (tamaños mezclados)
-        n_min=2,
-        n_max=12,
+        n_min=8,
+        n_max=8,
 
-        # "mixed" | "all_connected" | "all_disconnected"
         connectivity="mixed",
 
-        # exacto factorial sólo hasta acá; después samplea
-        exhaustive_n_max=8,
+        exhaustive_n_max=8,   # WARNING: factorial if n<=exhaustive_n_max (10! per graph if n=10)
         sampled_orderings=512,
 
         resume=True,
         flush_every=25,
+        workers=None,          # auto: cpu_count()-1
+        chunksize=25,
     )
+
     print("Wrote (append/resume):", jsonl_path)
     print("Wrote (append/resume):", csv_path)
