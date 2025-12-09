@@ -1,28 +1,22 @@
-# run_2tnn_batch.py
-#
-# Batch driver:
-#   - reads graphs from a CSV
-#   - runs tn(G) <= 2 recognition
-#   - times each call
-#   - writes results.csv with timing info
-#
-# Required input columns:
-#   graph_id, n, m, edges
-#
-# 'edges' must be a string representation of a list of pairs, e.g.:
-#   "[[0, 1], [1, 2]]"
-#
-
 from __future__ import annotations
 import ast
 import csv
 import time
+import logging  ### NEW
 from typing import List, Tuple
 
 import pandas as pd
 
 from finalAlgorithm import Graph, make_graph, tn_leq_2_by_components
 
+# -----------------------------------------------------------
+# Logging config
+# -----------------------------------------------------------
+
+logging.basicConfig(
+    level=logging.INFO,  # change to DEBUG if you want even more detail
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 # -----------------------------------------------------------
 # CSV / parsing utilities
@@ -76,40 +70,114 @@ def process_graphs(
       - run tn_leq_2_by_components
       - measure elapsed time in milliseconds
       - store row: graph_id, graph (edges string), n, m, time_ms
-    Write all rows to output_csv and return the DataFrame.
-    Complexity: sum over graphs of recognition cost (exponential in size)
-                plus linear I/O.
+
+    NEW BEHAVIOR:
+      - Logs timing for each row.
+      - Writes each row to `output_csv` immediately (progress is saved
+        continuously), instead of only at the end.
     """
     rows = load_graphs_csv(input_csv)
+    total = len(rows)
+    logging.info("Loaded %d graphs from %s", total, input_csv)
+
+    fieldnames = ["graph_id", "graph", "n", "m", "time_ms", "result"]
     out_rows = []
-    for (gid, g, raw_edges, n, m) in rows:
-        t0 = time.perf_counter()
-        _ = tn_leq_2_by_components(g, n_limit_for_search=n_limit_for_search)
-        t1 = time.perf_counter()
-        ms = (t1 - t0) * 1000.0
 
-        out_rows.append({
-            "graph_id": gid,
-            "graph": raw_edges,
-            "n": n,
-            "m": m,
-            "time_ms": round(ms, 3),
-        })
+    # Open output file once, write header, then write & flush every row
+    with open(output_csv, "w", newline="", encoding="utf-8") as f_out:
+        writer = csv.DictWriter(f_out, fieldnames=fieldnames)
+        writer.writeheader()
 
-    df = pd.DataFrame(out_rows, columns=["graph_id", "graph", "n", "m", "time_ms"])
-    df.to_csv(output_csv, index=False)
+        for idx, (gid, g, raw_edges, n, m) in enumerate(rows, start=1):
+            t0 = time.perf_counter()
+            res = tn_leq_2_by_components(g, n_limit_for_search=n_limit_for_search)
+            t1 = time.perf_counter()
+            ms = (t1 - t0) * 1000.0
+            ms_rounded = round(ms, 3)
+
+            row_dict = {
+                "graph_id": gid,
+                "graph": raw_edges,
+                "n": n,
+                "m": m,
+                "time_ms": ms_rounded,
+                "result": str(int(res)),
+            }
+
+            # Save row in memory (for the final DataFrame)
+            out_rows.append(row_dict)
+
+            # Immediately append to CSV and flush so progress is persisted
+            writer.writerow(row_dict)
+            f_out.flush()
+
+            # Log progress for this row
+            logging.info(
+                "Processed row %d/%d: graph_id=%s, n=%d, m=%d, result=%s, time=%.3f ms",
+                idx, total, gid, n, m, int(res), ms_rounded
+            )
+
+
+    df = pd.DataFrame(out_rows, columns=fieldnames)
+    logging.info("Finished processing all graphs. Results written to %s", output_csv)
     return df
 
-
-# -----------------------------------------------------------
-# CLI entry point
-# -----------------------------------------------------------
+def make_complete_binary_tree(depth: int) -> Tuple[int, List[Tuple[int, int]]]:
+    """
+    Build a complete binary tree of given depth.
+    Depth 1 => 1 node
+    Depth 2 => 3 nodes
+    Depth 3 => 7 nodes
+    etc.
+    Returns: (n, edges)
+    """
+    n = 2**depth - 1  # number of nodes
+    edges = []
+    for i in range(n):
+        left = 2*i + 1
+        right = 2*i + 2
+        if left < n:
+            edges.append((i, left))
+        if right < n:
+            edges.append((i, right))
+    return n, edges
 
 if __name__ == "__main__":
     # Adjust these paths as needed
-    input_csv = r"C:\Users\af46294\Downloads\GraphPropertyPredict-main\GraphPropertyPredict-main\ordering_dataset.csv"    # your multi-graph CSV
-    output_csv = "results.csv"  # results with timings
+    depths = [2, 3, 4,5]
+    rows = []
 
-    df = process_graphs(input_csv, output_csv, n_limit_for_search=9)
-    print("Wrote results to", output_csv)
+    for d in depths:
+        n, edges = make_complete_binary_tree(d)
+        m = len(edges)
+        g = make_graph(n, edges)
+
+        # run your algorithm
+        t0 = time.perf_counter()
+        res = tn_leq_2_by_components(g, n_limit_for_search=9)
+        t1 = time.perf_counter()
+        ms = round((t1 - t0) * 1000.0, 3)
+
+        rows.append({
+            "graph_id": f"binary_depth_{d}",
+            "graph": str(edges),
+            "n": n,
+            "m": m,
+            "time_ms": ms,
+            "result": int(res),
+        })
+
+        print(f"Depth {d} → n={n}, m={m}, result={res}, time={ms} ms")
+
+    # convert to DataFrame
+    df = pd.DataFrame(rows)
+    print("\nGenerated test dataframe:")
     print(df)
+
+
+    # input_csv = r"C:\Users\fridm\Desktop\GraphPropertyPredict\combinedData.csv"    # your multi-graph CSV
+    # output_csv = "results.csv"  # results with timings
+
+    # df = process_graphs(input_csv, output_csv, n_limit_for_search=9)
+    # print("Wrote results to", output_csv)
+    # print(df)

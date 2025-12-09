@@ -1,13 +1,18 @@
-# graph_2tnn.py
-#
+
 # Core data structures and algorithms to check whether a graph
 # admits a k-track nearest-neighbor layout for k in {1,2}.
 #
-# Every function has a short complexity comment in the docstring.
+# Improved version:
+#   - adds fast recognition + explicit (verified) constructions for known
+#     YES-classes (paths/linear forests, cycles, path+one-extra-edge,
+#     and bounded-degree caterpillars),
+#   - uses a fast K4 detector once Δ<=4 is known,
+#   - preserves the overall structure: component cuts -> cheap YES -> search.
+#
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Set
+from typing import List, Tuple, Dict, Set, Optional
 import itertools
 
 
@@ -30,7 +35,7 @@ def make_graph(n: int, edges: List[Tuple[int, int]]) -> Graph:
     adj: List[Set[int]] = [set() for _ in range(n)]
     norm_edges: List[Tuple[int, int]] = []
     for (u, v) in edges:
-        if u == v:  # ignore self-loops if present
+        if u == v:
             continue
         a, b = (u, v) if u < v else (v, u)
         if b not in adj[a]:
@@ -41,34 +46,24 @@ def make_graph(n: int, edges: List[Tuple[int, int]]) -> Graph:
 
 
 def num_edges(g: Graph) -> int:
-    """
-    Return |E|.
-    Complexity: O(1), using stored edge list.
-    """
+    """Return |E|.  Complexity: O(1)."""
     return len(g.edges)
 
 
 def degrees(g: Graph) -> List[int]:
-    """
-    Return list of degrees for all vertices.
-    Complexity: O(n).
-    """
+    """Return list of degrees for all vertices.  Complexity: O(n)."""
     return [len(g.adj[v]) for v in range(g.n)]
 
 
 def max_degree(g: Graph) -> int:
-    """
-    Return maximum degree Δ(G).
-    Complexity: O(n).
-    """
+    """Return maximum degree Δ(G).  Complexity: O(n)."""
     return max(degrees(g)) if g.n > 0 else 0
 
 
 def connected_components(g: Graph) -> List[List[int]]:
     """
     Return list of connected components, each as a list of vertices.
-    BFS-based.
-    Complexity: O(n + m).
+    BFS-based.  Complexity: O(n + m).
     """
     seen = [False] * g.n
     comps: List[List[int]] = []
@@ -103,12 +98,30 @@ def induced_subgraph(g: Graph, verts: List[int]) -> Graph:
 
 def has_k4(g: Graph) -> bool:
     """
-    Naively detect a K4 by enumerating all 4-vertex subsets.
-    Complexity: O(n^4) in worst case, OK for small graphs.
+    Detect a K4. If Δ<=4 (as in our k<=2 pipeline), this runs in O(n).
+    Falls back to O(n^4) only if Δ is large (still OK for small graphs).
+
+    Complexity:
+      - If Δ(G) <= 4: O(n) (each vertex checks <=4 choose 3 neighbor-triples)
+      - Worst case: O(n^4)
     """
     n = g.n
     if n < 4:
         return False
+
+    degs = degrees(g)
+    if max(degs) <= 4:
+        adj = g.adj
+        for v in range(n):
+            N = list(adj[v])
+            if len(N) < 3:
+                continue
+            for a, b, c in itertools.combinations(N, 3):
+                if (b in adj[a]) and (c in adj[a]) and (c in adj[b]):
+                    return True
+        return False
+
+    # fallback
     adj = g.adj
     for a, b, c, d in itertools.combinations(range(n), 4):
         if (b in adj[a] and c in adj[a] and d in adj[a] and
@@ -136,14 +149,13 @@ def legal_host_edges_for_layout(
     Legal edges connect pred/succ along each track and pred/succ on every
     other track (nearest cross-track neighbors).
     Returns a set of edges (u, v) with u < v.
-    Complexity: O(n k + m_host), where m_host is number of legal host edges.
+
+    Complexity: O(n k + m_host).
     """
-    # position[v] = index in order
     pos = [-1] * n
     for i, v in enumerate(order):
         pos[v] = i
 
-    # vertices per track, sorted by position
     track_lists: Dict[int, List[int]] = {t: [] for t in range(1, k + 1)}
     for v in range(n):
         track_lists[tracks[v]].append(v)
@@ -161,9 +173,9 @@ def legal_host_edges_for_layout(
         lst = track_lists[t]
         for i, v in enumerate(lst):
             if i > 0:
-                add_edge(lst[i - 1], v)       # pred_t(v) -- v
+                add_edge(lst[i - 1], v)
             if i < len(lst) - 1:
-                add_edge(v, lst[i + 1])       # v -- succ_t(v)
+                add_edge(v, lst[i + 1])
 
     # Cross-track pred/succ
     if k >= 2:
@@ -175,7 +187,7 @@ def legal_host_edges_for_layout(
                     if s == t:
                         continue
                     other = track_lists[s]
-                    # binary search in other for nearest neighbors in position
+                    # lower_bound by position
                     lo, hi = 0, len(other)
                     while lo < hi:
                         mid = (lo + hi) // 2
@@ -183,11 +195,10 @@ def legal_host_edges_for_layout(
                             lo = mid + 1
                         else:
                             hi = mid
-                    # left neighbor: lo-1; right neighbor: lo
                     if lo - 1 >= 0:
-                        add_edge(v, other[lo - 1])  # pred_s(v)
+                        add_edge(v, other[lo - 1])
                     if lo < len(other):
-                        add_edge(v, other[lo])      # succ_s(v)
+                        add_edge(v, other[lo])
 
     return legal
 
@@ -201,7 +212,7 @@ def is_layout_nearest_neighbor(
 ) -> bool:
     """
     Check if (order, tracks) is a k-track nearest-neighbor layout for all edges.
-    Complexity: O(n k + m), where m = |E|.
+    Complexity: O(n k + m).
     """
     legal = legal_host_edges_for_layout(n, edges, order, tracks, k)
     for (u, v) in edges:
@@ -209,6 +220,365 @@ def is_layout_nearest_neighbor(
         if (a, b) not in legal:
             return False
     return True
+
+
+# -----------------------------------------------------------
+# Known YES-classes + explicit constructions (verified)
+# -----------------------------------------------------------
+
+def _path_order_if_path(g: Graph) -> Optional[List[int]]:
+    """
+    If g is a connected path (or single vertex), return its vertex order along the path.
+    Otherwise return None.
+
+    Complexity: O(n + m).
+    """
+    n = g.n
+    if n == 0:
+        return []
+    m = num_edges(g)
+    deg = degrees(g)
+
+    if n == 1:
+        return [0]
+    if m != n - 1:
+        return None
+    if max(deg) > 2:
+        return None
+
+    ends = [v for v in range(n) if deg[v] == 1]
+    if len(ends) != 2:
+        return None
+
+    start = ends[0]
+    order: List[int] = []
+    prev = -1
+    cur = start
+    while True:
+        order.append(cur)
+        nxts = [w for w in g.adj[cur] if w != prev]
+        if not nxts:
+            break
+        prev, cur = cur, nxts[0]
+
+    if len(order) != n:
+        return None
+    return order
+
+
+def _cycle_order_if_cycle(g: Graph) -> Optional[List[int]]:
+    """
+    If g is a connected cycle C_n (n>=3), return the cyclic order list [v0,v1,...,v_{n-1}]
+    in global order. Else None.
+
+    Complexity: O(n + m).
+    """
+    n = g.n
+    if n < 3:
+        return None
+    if num_edges(g) != n:
+        return None
+    deg = degrees(g)
+    if any(d != 2 for d in deg):
+        return None
+
+    start = 0
+    order = [start]
+    prev = -1
+    cur = start
+    while True:
+        neigh = list(g.adj[cur])
+        nxt = neigh[0] if neigh[0] != prev else neigh[1]
+        if nxt == start:
+            break
+        order.append(nxt)
+        prev, cur = cur, nxt
+        if len(order) > n:
+            return None
+
+    if len(order) != n:
+        return None
+    return order
+
+
+def _strip_leaves_core(g: Graph) -> Set[int]:
+    """
+    Return the set of vertices remaining after repeatedly stripping degree<=1 vertices
+    (the 2-core). For a connected unicyclic graph, this is exactly its unique cycle.
+
+    Complexity: O(n + m).
+    """
+    n = g.n
+    deg = [len(g.adj[v]) for v in range(n)]
+    alive = [True] * n
+    q = [v for v in range(n) if deg[v] <= 1]
+    for v in q:
+        alive[v] = False
+    head = 0
+    while head < len(q):
+        v = q[head]
+        head += 1
+        for w in g.adj[v]:
+            if alive[w]:
+                deg[w] -= 1
+                if deg[w] <= 1:
+                    alive[w] = False
+                    q.append(w)
+    return {v for v in range(n) if alive[v]}
+
+
+def _try_layout_cycle(g: Graph) -> bool:
+    """
+    Construct the standard 2-track layout for a cycle as in the writeup:
+      order: v0 < v1 < ... < v_{n-1}
+      track1: {v0, v_{n-1}}, track2: others
+
+    Complexity: O(n + m).
+    """
+    cyc = _cycle_order_if_cycle(g)
+    if cyc is None:
+        return False
+    n = g.n
+    order = cyc[:]  # already a permutation
+    tracks = [2] * n
+    tracks[order[0]] = 1
+    tracks[order[-1]] = 1
+    return is_layout_nearest_neighbor(n, g.edges, order, tracks, k=2)
+
+
+def _try_layout_path_plus_one_edge(g: Graph) -> bool:
+    """
+    Try to recognize "path + one extra edge" and build the canonical 2-track layout:
+      - Find the unique chord e* such that removing it yields a path.
+      - Order vertices along that path.
+      - Put chord endpoints on track 2, all others on track 1.
+
+    Complexity: O(n + m). (We only test cycle-edges as chord candidates.)
+    """
+    n = g.n
+    if n <= 2:
+        return True
+    if num_edges(g) != n:  # connected unicyclic prerequisite for this class
+        return False
+
+    deg0 = degrees(g)
+    if max(deg0) > 4:
+        return False
+
+    core = _strip_leaves_core(g)
+    if len(core) < 3:
+        return False  # should not happen for simple connected unicyclic with n>=3
+
+    core_edges = [(u, v) for (u, v) in g.edges if u in core and v in core]
+    if not core_edges:
+        return False
+
+    # Candidate chord = a cycle-edge whose removal makes max degree <= 2 (i.e., a path).
+    chord: Optional[Tuple[int, int]] = None
+    for (a, b) in core_edges:
+        deg = deg0[:]
+        deg[a] -= 1
+        deg[b] -= 1
+        if max(deg) <= 2:
+            # Removing this core-edge keeps the graph connected (unicyclic property),
+            # and max degree <= 2 implies the resulting tree is a path.
+            chord = (a, b)
+            break
+
+    if chord is None:
+        return False
+
+    # Build adjacency of the path tree = all edges except chord
+    adj_path: List[Set[int]] = [set(neis) for neis in g.adj]
+    a, b = chord
+    if b in adj_path[a]:
+        adj_path[a].remove(b)
+        adj_path[b].remove(a)
+
+    deg_path = [len(adj_path[v]) for v in range(n)]
+    ends = [v for v in range(n) if deg_path[v] == 1]
+    if n > 1 and len(ends) != 2:
+        return False
+
+    # Extract the path order by walking from an endpoint
+    start = ends[0] if n > 1 else 0
+    order: List[int] = []
+    prev = -1
+    cur = start
+    while True:
+        order.append(cur)
+        nxts = [w for w in adj_path[cur] if w != prev]
+        if not nxts:
+            break
+        prev, cur = cur, nxts[0]
+
+    if len(order) != n:
+        return False
+
+    # Canonical track assignment
+    tracks = [1] * n
+    tracks[a] = 2
+    tracks[b] = 2
+
+    return is_layout_nearest_neighbor(n, g.edges, order, tracks, k=2)
+
+
+def _is_tree(g: Graph) -> bool:
+    """Connected component g is a tree iff m = n-1. Complexity: O(1) with stored m."""
+    return g.n <= 1 or num_edges(g) == g.n - 1
+
+
+def _is_caterpillar_tree(g: Graph) -> bool:
+    """
+    Caterpillar test (connected tree): removing all original leaves yields a path (or empty/single).
+    Equivalent: induced subgraph on vertices with degree >= 2 is a path (or size <= 1).
+
+    Complexity: O(n + m).
+    """
+    if not _is_tree(g):
+        return False
+    n = g.n
+    if n <= 2:
+        return True
+
+    deg = degrees(g)
+    core = [v for v in range(n) if deg[v] >= 2]
+    if len(core) <= 1:
+        return True
+
+    core_set = set(core)
+    core_adj: Dict[int, List[int]] = {v: [w for w in g.adj[v] if w in core_set] for v in core}
+    # core must be connected and have max degree <=2 and |E_core| = |V_core|-1
+    max_core_deg = max(len(core_adj[v]) for v in core)
+    if max_core_deg > 2:
+        return False
+
+    e_core2 = sum(len(core_adj[v]) for v in core)  # 2*|E_core|
+    if e_core2 != 2 * (len(core) - 1):
+        return False
+
+    # connected check on core
+    start = core[0]
+    seen = {start}
+    stack = [start]
+    while stack:
+        v = stack.pop()
+        for w in core_adj[v]:
+            if w not in seen:
+                seen.add(w)
+                stack.append(w)
+    return len(seen) == len(core)
+
+
+def _try_layout_caterpillar(g: Graph) -> bool:
+    """
+    Construct and verify a 2-track layout for a caterpillar with Δ<=4:
+      - Put spine (core) on track 1 in path order.
+      - Put leaves on track 2, placed near their spine neighbor (some before, some after).
+
+    Complexity: O(n + m).
+    """
+    if not _is_caterpillar_tree(g):
+        return False
+    if max_degree(g) > 4:
+        return False
+
+    n = g.n
+    if n <= 1:
+        return True
+
+    deg = degrees(g)
+
+    # Identify spine/core
+    spine = [v for v in range(n) if deg[v] >= 2]
+    spine_set = set(spine)
+
+    tracks = [2] * n
+    if len(spine) == 0:
+        # connected implies n<=2 (already handled), but be safe
+        tracks = [1] * n
+        order = list(range(n))
+        return is_layout_nearest_neighbor(n, g.edges, order, tracks, k=1)
+
+    for v in spine:
+        tracks[v] = 1
+
+    # If spine size 1: it's a star-like caterpillar, easy: put center first then all leaves.
+    if len(spine) == 1:
+        center = spine[0]
+        leaves = [v for v in range(n) if v != center]
+        order = [center] + leaves
+        return is_layout_nearest_neighbor(n, g.edges, order, tracks, k=2)
+
+    # Build the spine path order
+    spine_graph = make_graph(
+        len(spine),
+        [(spine.index(u), spine.index(v)) for (u, v) in g.edges if u in spine_set and v in spine_set],
+    )
+    spine_order_idx = _path_order_if_path(spine_graph)
+    if spine_order_idx is None:
+        return False
+    spine_order = [spine[i] for i in spine_order_idx]
+
+    # Build global order by interleaving leaves around spine vertices
+    used = set()
+    order: List[int] = []
+    for s in spine_order:
+        # Leaves are degree-1 neighbors of s
+        leaves = [u for u in g.adj[s] if deg[u] == 1]
+        leaves.sort()
+        if len(leaves) >= 2:
+            # put one leaf immediately before s, one immediately after
+            order.append(leaves[0]); used.add(leaves[0])
+            order.append(s); used.add(s)
+            order.append(leaves[1]); used.add(leaves[1])
+            for extra in leaves[2:]:
+                # shouldn't happen under Δ<=4, but keep deterministic
+                order.append(extra); used.add(extra)
+        elif len(leaves) == 1:
+            order.append(s); used.add(s)
+            order.append(leaves[0]); used.add(leaves[0])
+        else:
+            order.append(s); used.add(s)
+
+    # Append any leftover vertices (defensive; should be none)
+    for v in range(n):
+        if v not in used:
+            order.append(v)
+
+    if len(order) != n or len(set(order)) != n:
+        return False
+    return is_layout_nearest_neighbor(n, g.edges, order, tracks, k=2)
+
+
+def _try_fast_yes_component(g: Graph) -> bool:
+    """
+    Try fast YES checks/constructions for known classes (for tn<=2).
+    Returns True if accepted, False otherwise.
+
+    Complexity: O(n + m).
+    """
+    # k=1: connected linear forest means "path (or isolate)"
+    path_order = _path_order_if_path(g)
+    if path_order is not None:
+        # 1-track layout: order along the path, all on track 1
+        tracks = [1] * g.n
+        if is_layout_nearest_neighbor(g.n, g.edges, path_order, tracks, k=1):
+            return True
+
+    # cycle
+    if _try_layout_cycle(g):
+        return True
+
+    # path + one extra edge (unicyclic with special chord)
+    if _try_layout_path_plus_one_edge(g):
+        return True
+
+    # caterpillar (tree) with Δ<=4
+    if _try_layout_caterpillar(g):
+        return True
+
+    return False
 
 
 # -----------------------------------------------------------
@@ -221,17 +591,28 @@ def tn_leq_k_by_search(g: Graph, k: int, n_limit_for_search: int = 9) -> bool:
     by exhaustive search over:
       - all permutations of vertices (global orders)
       - all track assignments (k^n possibilities) with simple symmetry breaking.
+
     Complexity (worst-case): O(n! * k^n * (n + m)), exponential in n.
     Intended only for small graphs; n_limit_for_search bounds the size.
     """
     n = g.n
-    m = num_edges(g)
 
     # Quick necessary condition for k = 1: Δ(G) <= 2
     if k == 1 and max_degree(g) > 2:
         return False
 
-    if n == 0 or n == 1:
+    if n <= 1:
+        return True
+
+    # Fast known-class acceptance before brute force (helps even for small n)
+    if k == 1:
+        # If it's a path, accept immediately (path_order + verify)
+        path_order = _path_order_if_path(g)
+        if path_order is not None:
+            tracks = [1] * n
+            return is_layout_nearest_neighbor(n, g.edges, path_order, tracks, k=1)
+
+    if k == 2 and _try_fast_yes_component(g):
         return True
 
     if n > n_limit_for_search:
@@ -265,10 +646,13 @@ def tn_leq_2_by_components(g: Graph, n_limit_for_search: int = 9) -> bool:
     """
     Decide if tn(G) <= 2 using connected components:
        tn(G) = max_i tn(G_i).
-    For each component, apply fast filters and then exhaustive search for
-    k = 1 and k = 2.
-    Complexity: sum over components of the exponential search on each,
-    plus linear-time filters. Exponential in component size.
+
+    For each component:
+      - apply fast filters (cuts),
+      - apply cheap YES recognizers + verified constructions for known families,
+      - finally fall back to exhaustive search (size-bounded).
+
+    Complexity: linear-time filters + (optional) exponential search on small components.
     """
     if g.n == 0:
         return True
@@ -279,30 +663,32 @@ def tn_leq_2_by_components(g: Graph, n_limit_for_search: int = 9) -> bool:
         nH = H.n
         mH = num_edges(H)
 
-        # Small components are always representable with <= 2 tracks
+        # Cut 0: tiny graphs are always <=2
         if nH <= 3:
             continue
 
-        # Edge bound for k=2: m <= 2n - 3
+        # Cut 1: (your existing density bound for k=2)
         if mH > 2 * nH - 3:
             return False
 
-        # Degree bound: Δ(G) <= 4 for k=2
+        # Cut 2: Δ(G) <= 4 for k=2 (your existing filter)
         if max_degree(H) > 4:
             return False
 
-        # K4 forces k >= 3
+        # Cut 3: K4 forces k >= 3
         if has_k4(H):
             return False
 
-        # Try k=1, then k=2
+        # Cheap YES: known classes + verified constructions (works for large n too)
+        if _try_fast_yes_component(H):
+            continue
+
+        # Fallback: try k=1, then k=2 by bounded exhaustive search
         if tn_leq_k_by_search(H, k=1, n_limit_for_search=n_limit_for_search):
             continue
         if tn_leq_k_by_search(H, k=2, n_limit_for_search=n_limit_for_search):
             continue
 
-        # No layout with k <= 2 found for this component
         return False
 
-    # All components accept
     return True
