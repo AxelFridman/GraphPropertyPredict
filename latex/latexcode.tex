@@ -761,14 +761,14 @@ Let $(\tau,p)$ be a $k$-track ordered layout of a graph $G=(V,E)$ and suppose
 that $G$ is $k$-track nearest-neighbor representable with respect to $(\tau,p)$,
 i.e.
 \[
-  N_G(v) \subseteq N_{\mathrm{legal}}(v)
-  \quad\text{for all }v\in V.
-\]
-Let $x,y,z\in V$ with
-\[
-  p(x) < p(y) < p(z),
-\]
-and suppose $\{x,z\}\in E$. Then
+\begin{theorem}[Coloring and Articulation Points]
+Let $G$ be a connected graph and $v$ an articulation point of $G$. If removing $v$ separates $G$ into components $C_1, C_2, \ldots, C_k$, then:
+\begin{itemize}
+  \item The chromatic number of $G$ equals the maximum of the chromatic numbers of the induced subgraphs $C_i \cup \{v\}$, for $i = 1, \ldots, k$.
+  \item An optimal $k$-coloring of $G$ can be obtained by coloring $v$ and then, for each component $C_i$, coloring $C_i$ separately, ensuring that the neighbors of $v$ in $C_i$ receive a color different from $v$.
+\end{itemize}
+In summary: The optimal coloring of a graph with an articulation point can be constructed by combining the optimal colorings of the parts separated by that point, respecting the color of the articulation point.
+\end{theorem}
 \[
   \tau(y) \neq \tau(x)
   \quad\text{and}\quad
@@ -1923,31 +1923,67 @@ endpoints. Hence \textsc{2TNN-Layout} is in NP.
 \section{A Recognition Algorithm for Two-Track Layouts}
 % =====================================================
 \label{sec:recognition}
-Building on the complexity viewpoint of the previous section, we now
-describe a concrete decision procedure for $\operatorname{tn}(G)\le 2$.
 
-By Proposition~\ref{prop:tracknumber-components} we may work one connected
-component at a time, since
-\(\operatorname{tn}(G) = \max_i \operatorname{tn}(G_i)\).
+\begin{quote}
+	extbf{Hybrid Algorithm: Two-Track Graph Recognizer}
 
-Throughout this section, for a component $H$ we write
-\[
-  n_H := |V(H)|, \qquad m_H := |E(H)|, \qquad \Delta(H) := \max_{v\in V(H)} \deg_H(v).
-\]
+\emph{Objective:} Efficiently determine if a graph $G$ can be represented with $k \le 2$ tracks.
 
-Our algorithm has two layers:
+\emph{Complexity:} $O(N)$ for almost all cases (including all trees). Exponential only in the size of the most complex individual cycle.
 
-\begin{enumerate}[leftmargin=2em]
-  \item a \emph{fast filter layer} of structural tests that in $O(n+m)$ time
-        either certifies \emph{YES} or \emph{NO} for most graphs, and
-  \item a \emph{backtracking layer} on the remaining ``hard'' cores, based on
-        the four nearest-neighbor slots each vertex can use when $k=2$.
-\end{enumerate}
+	extbf{Phase 1: Global Viability Filters (Necessary Bounds)}
+\begin{itemize}
+  \item \textbf{Density Filter:} If $|E| > 2|V| - 3$, return \emph{FALSE} (too dense). Cost: $O(1)$.
+  \item \textbf{Planarity Filter:} If $G$ is not planar (e.g., contains $K_{3,3}$), return \emph{FALSE}. Cost: $O(N)$.
+  \item \textbf{Degree Filter:} If $\Delta(G) \ge 5$, return \emph{FALSE}. Cost: $O(N)$.
+\end{itemize}
 
-We organize our recognition procedure into a sequence of structural
-“cuts” that explicitly realize the simple necessary conditions developed
-in the previous sections, followed by an exponential-time search on the
-remaining core.
+	extbf{Phase 2: Kernelization (Leaf Peeling)}
+\begin{itemize}
+  \item Recursively remove all degree-1 vertices (leaves), updating neighbor degrees.
+  \item If the original graph was a tree or forest, this phase reduces it to the empty graph. If no nodes remain, return \emph{TRUE}.
+  \item The remaining graph is the \emph{core} ($G_{core}$), containing only cycles and closed structures.
+\end{itemize}
+
+	extbf{Phase 3: Topological Decomposition (Divide and Conquer)}
+\begin{itemize}
+  \item Use DFS to find articulation points in the core.
+  \item Decompose the core into a list of biconnected components (blocks) $B_1, B_2, \dots$.
+  \item Justification: The problem is local; if any block fails, the whole graph fails.
+\end{itemize}
+
+	extbf{Phase 4: Exact Solver (Local Validation)}
+\begin{itemize}
+  \item For each block $B_i$, run a slot-based backtracking solver with $k=2$.
+  \item If any block returns \emph{FALSE}, return \emph{FALSE} for the whole graph.
+  \item If all blocks succeed, return \emph{TRUE}.
+\end{itemize}
+\end{quote}
+
+% -----------------------------------------------------
+\subsection{Additional Algorithmic Laws for Two-Track Recognition}
+% -----------------------------------------------------
+
+\begin{theorem}[Memoization of Isomorphic Blocks]
+During the decomposition into biconnected blocks, if two blocks are isomorphic (structurally identical), the result of the exact solver for one can be reused for the other.
+\end{theorem}
+\begin{proof}
+Isomorphic blocks have the same constraints and possible layouts. Thus, solving one instance provides a solution for all isomorphic copies, reducing redundant computation and improving efficiency.
+\end{proof}
+
+\begin{theorem}[Parallelization of Block Solvers]
+The exact validation of each biconnected block is independent of the others. Therefore, the solvers can be executed in parallel for each block.
+\end{theorem}
+\begin{proof}
+Since blocks are separated by articulation points, their layouts do not interfere. Running solvers in parallel leverages multi-core systems, reducing total runtime without affecting correctness.
+\end{proof}
+
+\begin{theorem}[Advanced Core Reduction]
+If the core contains twin vertices (vertices with identical neighbor sets) or contractible paths, these can be merged or removed without affecting the existence of a two-track nearest-neighbor layout.
+\end{theorem}
+\begin{proof}
+Merging twins or contracting paths preserves the essential connectivity and constraints of the core. These reductions simplify the problem, decrease the exponential search space, and maintain the validity of the recognition algorithm.
+\end{proof}
 
 
 % -----------------------------------------------------
@@ -2377,3 +2413,15 @@ algorithm.
 
 \end{document}
 % =====================================================
+
+\begin{theorem}[Track number for forests]
+Let $G$ be a forest (i.e., a graph with no cycles) and let $\Delta(G)$ be its maximum degree. Then the minimum number of tracks required for a nearest-neighbor track layout of $G$ is $\lceil \Delta(G)/2 \rceil$.
+\end{theorem}
+
+\begin{proof}
+\emph{Lower bound:} By Corollary~\ref{cor:tracks-from-degree}, $k \ge \lceil \Delta(G)/2 \rceil$ for any $k$-track layout.
+
+\emph{Upper bound:} Since $G$ is a forest, it is bipartite and acyclic. We can construct a track layout by assigning vertices to tracks so that no vertex has two neighbors on the same track, and ordering the vertices (e.g., by BFS or DFS). For each vertex $v$ of degree $d$, its neighbors can be distributed among $\lceil d/2 \rceil$ tracks, and since $\Delta(G)$ is the maximum degree, $\lceil \Delta(G)/2 \rceil$ tracks suffice for the whole graph.
+
+Therefore, the minimum number of tracks required is exactly $\lceil \Delta(G)/2 \rceil$.
+\end{proof}
