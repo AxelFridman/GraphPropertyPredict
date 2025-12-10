@@ -1961,9 +1961,39 @@ endpoints. Hence \textsc{2TNN-Layout} is in NP.
 \end{quote}
 
 % -----------------------------------------------------
+\section{Leyes Fundamentales sobre Tracks y Coloración}
+
+\subsection{Ley de los puntos de articulación y coloración óptima}
+\begin{theorem}[Coloring and Articulation Points]
+Let $G$ be a connected graph and $v$ an articulation point of $G$. If removing $v$ separates $G$ into components $C_1, C_2, \ldots, C_k$, then:
+\begin{itemize}
+  \item The chromatic number of $G$ equals the maximum of the chromatic numbers of the induced subgraphs $C_i \cup \{v\}$, for $i = 1, \ldots, k$.
+  \item An optimal $k$-coloring of $G$ can be obtained by coloring $v$ and then, for each component $C_i$, coloring $C_i$ separately, ensuring that the neighbors of $v$ in $C_i$ receive a color different from $v$.
+\end{itemize}
+In summary: The optimal coloring of a graph with an articulation point can be constructed by combining the optimal colorings of the parts separated by that point, respecting the color of the articulation point.
+\end{theorem}
+
+\subsection{Ley para bosques y árboles (track number)}
+\begin{theorem}[Track Number of Forests and Trees]
+A graph $G$ is a forest (i.e., acyclic) if and only if its nearest-neighbor track number is $1$. In particular, every tree admits a $1$-track nearest-neighbor layout.
+\end{theorem}
+\begin{proof}
+A $1$-track layout only allows paths and isolated vertices (a linear forest). Any cycle would require at least two tracks. Thus, $G$ is a forest if and only if it is $1$-track representable.
+\end{proof}
+
+\subsection{Ley para el número de tracks en función del grado máximo}
+\begin{theorem}[Track Number and Maximum Degree in Forests]
+If $G$ is a forest with maximum degree $\Delta$, then its nearest-neighbor track number $k$ satisfies $k = \lceil \Delta/2 \rceil$.
+\end{theorem}
+\begin{proof}
+In a $1$-track layout, each vertex can have at most two neighbors (left and right). For higher degrees, the minimum number of tracks needed is $\lceil \Delta/2 \rceil$ to avoid conflicts.
+\end{proof}
+
+\subsection{Leyes algorítmicas para reconocimiento de dos tracks}
+
+% -----------------------------------------------------
 \subsection{Additional Algorithmic Laws for Two-Track Recognition}
 % -----------------------------------------------------
-
 \begin{theorem}[Memoization of Isomorphic Blocks]
 During the decomposition into biconnected blocks, if two blocks are isomorphic (structurally identical), the result of the exact solver for one can be reused for the other.
 \end{theorem}
