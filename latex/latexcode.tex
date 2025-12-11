@@ -2249,12 +2249,27 @@ time.
 % =====================================================
 \begin{thebibliography}{9}
 
+<<<<<<< HEAD
+
 % -----------------------------------------------------
 \section{Appendix: Grover Oracle for Coloring/QUBO}
 % -----------------------------------------------------
 \label{sec:grover-coloreo}
 
-In the context of this work, the efficient search for valid colorings can be approached using quantum algorithms, particularly Grover's algorithm, adapting the oracle logic to the track and coloring structure discussed in previous sections.
+In the context of this work, the efficient search for valid graph colorings can be approached using quantum algorithms, particularly Grover's algorithm. The oracle logic is adapted to the structure of tracks and colorings discussed in previous sections.
+
+\subsection{Quantum Theory for Graph Coloring}
+
+Quantum computing offers new paradigms for solving combinatorial problems, such as graph coloring, by leveraging superposition and amplitude amplification. Two main approaches are relevant:
+
+\begin{itemize}
+  \item \textbf{QUBO (Quadratic Unconstrained Binary Optimization):} Many graph problems, including coloring, can be formulated as QUBO models. The QUBO matrix encodes constraints (e.g., adjacent nodes must have different colors) and penalties, allowing quantum annealers or classical solvers to search for optimal solutions.
+  \item \textbf{Grover's Algorithm:} Grover's search algorithm provides a quadratic speedup for unstructured search problems. By constructing an oracle that marks valid colorings, Grover's algorithm amplifies the probability of measuring a correct solution.
+\end{itemize}
+
+In the graph coloring context, each possible coloring is represented as a quantum state. The oracle checks if a coloring is valid (no adjacent nodes share the same color) and marks it. Grover's diffusion operator then amplifies the amplitude of valid solutions. This process is repeated, and measurement yields a valid coloring with high probability.
+
+The QUBO approach encodes the coloring constraints into a quadratic Hamiltonian, suitable for quantum annealing or variational algorithms. The Grover approach, on the other hand, is more direct for small graphs, using explicit oracle construction and amplitude amplification.
 
 \subsection{Adapted Base Code (Qiskit)}
 The following code implements a Grover oracle for the graph coloring problem, inspired by the notebook \texttt{grover\_max\_cut.ipynb} and adapted to the structure and laws of this document:
@@ -2264,7 +2279,7 @@ import numpy as np
 import networkx as nx
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer, execute
 
-# Example graph
+# Grafo de ejemplo
 G = nx.Graph()
 G.add_edges_from([(0,1), (1,2), (2,3), (3,0), (0,2)])
 num_colors = 3
@@ -2277,7 +2292,7 @@ def coloring_oracle(qc, x, aux, edges, num_colors):
       qc.cx(x[i][b], aux)
       qc.cx(x[j][b], aux)
     qc.x(aux)
-    # Here a multi-controlled Toffoli (mct) should be used to mark coincidence
+    # Aquí debería ir un multi-controlled Toffoli (mct) para marcar coincidencia
     qc.x(aux)
     for b in range(color_bits):
       qc.cx(x[j][b], aux)
@@ -2292,7 +2307,7 @@ qc = QuantumCircuit(*x, aux, cr)
 for reg in x:
   qc.h(reg)
 coloring_oracle(qc, x, aux[0], list(G.edges), num_colors)
-# Grover diffusion (simplified)
+# Difusión de Grover (simplificada)
 for reg in x:
   qc.h(reg)
   qc.x(reg)
@@ -2312,27 +2327,14 @@ print(counts)
 \end{verbatim}
 
 \subsection{Relation to Track Theory}
-This oracle implements the verification of valid colorings, where each color can be interpreted as a track. The graph structure and adjacency constraints are reflected in the oracle logic, aligning with the laws and algorithms developed in this work. Thus, the integration of quantum techniques reinforces and complements the theoretical and algorithmic results presented.
+Este oráculo implementa la verificación de coloraciones válidas, donde cada color puede interpretarse como un track. La estructura del grafo y las restricciones de adyacencia se reflejan en la lógica del oráculo, alineándose con las leyes y algoritmos desarrollados en este trabajo. Así, la integración de técnicas cuánticas refuerza y complementa los resultados teóricos y algorítmicos presentados.
 
 \bibitem{dujmovic-track-layouts}
 V.~Dujmovi\'c, P.~Morin, and D.~R.~Wood.
 Track layouts of graphs.
 \emph{Discrete Mathematics \& Theoretical Computer Science} 6(2):497--522, 2004.
-\bibitem{dujmovic-layered-track}
-V.~Dujmovi\'c and D.~R.~Wood.
-Track layouts, layered path decompositions, and leveled planarity.
-\emph{Journal of Graph Theory}, to appear.
-Preprint available as arXiv:1506.09145.
-
-\bibitem{hopcroft-tarjan}
-J.~Hopcroft and R.~Tarjan.
-Efficient planarity testing.
-\emph{Journal of the ACM} 21(4):549--568, 1974.
-
-\bibitem{queue-number-survey}
-D.~Eppstein.
-Queue number.
-Available at \url{https://en.wikipedia.org/wiki/Queue_number}.
+=======
+>>>>>>> a9790f8e1f1123e0248b92bb88b9fbb3985fa274
 
 \bibitem{dujmovic-layered-track}
 V.~Dujmovi\'c and D.~R.~Wood.
