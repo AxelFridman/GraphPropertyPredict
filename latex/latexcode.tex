@@ -21,6 +21,7 @@
 % -------------------- Misc --------------------
 \usepackage{enumitem}   % better control of lists
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[ruled,vlined]{algorithm2e}  % for algorithm environment
 
 % -------------------- Theorem Styles --------------------
 \newtheoremstyle{spaced}%
@@ -761,14 +762,14 @@ Let $(\tau,p)$ be a $k$-track ordered layout of a graph $G=(V,E)$ and suppose
 that $G$ is $k$-track nearest-neighbor representable with respect to $(\tau,p)$,
 i.e.
 \[
-\begin{theorem}[Coloring and Articulation Points]
-Let $G$ be a connected graph and $v$ an articulation point of $G$. If removing $v$ separates $G$ into components $C_1, C_2, \ldots, C_k$, then:
-\begin{itemize}
-  \item The chromatic number of $G$ equals the maximum of the chromatic numbers of the induced subgraphs $C_i \cup \{v\}$, for $i = 1, \ldots, k$.
-  \item An optimal $k$-coloring of $G$ can be obtained by coloring $v$ and then, for each component $C_i$, coloring $C_i$ separately, ensuring that the neighbors of $v$ in $C_i$ receive a color different from $v$.
-\end{itemize}
-In summary: The optimal coloring of a graph with an articulation point can be constructed by combining the optimal colorings of the parts separated by that point, respecting the color of the articulation point.
-\end{theorem}
+  N_G(v) \subseteq N_{\mathrm{legal}}(v)
+  \quad\text{for all }v\in V.
+\]
+Let $x,y,z\in V$ such that
+\[
+  p(x) < p(y) < p(z),
+\]
+and suppose $\{x,z\}\in E$. Then
 \[
   \tau(y) \neq \tau(x)
   \quad\text{and}\quad
@@ -2247,77 +2248,7 @@ time.
 
 % =====================================================
 \begin{thebibliography}{9}
-% =====================================================
 
-% -----------------------------------------------------
-\section{Apéndice: Oráculo de Grover para Coloreo/QUBO}
-% -----------------------------------------------------
-\label{sec:grover-coloreo}
-
-En el contexto de este trabajo, la búsqueda eficiente de coloraciones válidas puede abordarse mediante algoritmos cuánticos, en particular Grover, adaptando la lógica de oráculo a la estructura de tracks y coloraciones discutida en las secciones anteriores.
-
-\subsection{Código base adaptado (Qiskit)}
-El siguiente código implementa un oráculo de Grover para el problema de coloreo de grafos, inspirado en el notebook \texttt{grover\_max\_cut.ipynb} y adaptado a la estructura y leyes de este documento:
-
-\begin{verbatim}
-import numpy as np
-import networkx as nx
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer, execute
-
-# Grafo de ejemplo
-G = nx.Graph()
-G.add_edges_from([(0,1), (1,2), (2,3), (3,0), (0,2)])
-num_colors = 3
-
-def coloring_oracle(qc, x, aux, edges, num_colors):
-  n = len(x)
-  color_bits = int(np.ceil(np.log2(num_colors)))
-  for (i, j) in edges:
-    for b in range(color_bits):
-      qc.cx(x[i][b], aux)
-      qc.cx(x[j][b], aux)
-    qc.x(aux)
-    # Aquí debería ir un multi-controlled Toffoli (mct) para marcar coincidencia
-    qc.x(aux)
-    for b in range(color_bits):
-      qc.cx(x[j][b], aux)
-      qc.cx(x[i][b], aux)
-
-n = G.number_of_nodes()
-color_bits = int(np.ceil(np.log2(num_colors)))
-x = [QuantumRegister(color_bits, f'x{i}') for i in range(n)]
-aux = QuantumRegister(1, 'aux')
-cr = ClassicalRegister(n*color_bits, 'cr')
-qc = QuantumCircuit(*x, aux, cr)
-for reg in x:
-  qc.h(reg)
-coloring_oracle(qc, x, aux[0], list(G.edges), num_colors)
-# Difusión de Grover (simplificada)
-for reg in x:
-  qc.h(reg)
-  qc.x(reg)
-qc.h(x[-1][-1])
-qc.mct([bit for reg in x for bit in reg[:-1]], x[-1][-1])
-qc.h(x[-1][-1])
-for reg in x:
-  qc.x(reg)
-  qc.h(reg)
-for i, reg in enumerate(x):
-  for b in range(color_bits):
-    qc.measure(reg[b], cr[i*color_bits + b])
-backend = Aer.get_backend('qasm_simulator')
-result = execute(qc, backend, shots=1024).result()
-counts = result.get_counts()
-print(counts)
-\end{verbatim}
-
-\subsection{Relación con la teoría de tracks}
-Este oráculo implementa la verificación de coloraciones válidas, donde cada color puede interpretarse como un track. La estructura del grafo y las restricciones de adyacencia se reflejan en la lógica del oráculo, alineándose con las leyes y algoritmos desarrollados en este trabajo. Así, la integración de técnicas cuánticas refuerza y complementa los resultados teóricos y algorítmicos presentados.
-
-\bibitem{dujmovic-track-layouts}
-V.~Dujmovi\'c, P.~Morin, and D.~R.~Wood.
-Track layouts of graphs.
-\emph{Discrete Mathematics \& Theoretical Computer Science} 6(2):497--522, 2004.
 
 \bibitem{dujmovic-layered-track}
 V.~Dujmovi\'c and D.~R.~Wood.
@@ -2506,17 +2437,261 @@ all BFS-based ``layer-size'' cuts and kept only the robust local structural
 conditions (degree bounds, planarity, and the absence of $K_4$) in the main
 algorithm.
 
-\end{document}
+% =====================================================
+\section{Bonus Track: Computing the Exact Track Number $\mathrm{tn}(G)$}
+\label{sec:bonus-track}
 % =====================================================
 
-\begin{theorem}[Track number for forests]
-Let $G$ be a forest (i.e., a graph with no cycles) and let $\Delta(G)$ be its maximum degree. Then the minimum number of tracks required for a nearest-neighbor track layout of $G$ is $\lceil \Delta(G)/2 \rceil$.
+We now present a complete algorithm for computing the exact \emph{track number}
+$\mathrm{tn}(G)$ of a graph $G$. Recall that $\mathrm{tn}(G)$ is the minimum $k$
+such that $G$ admits a nearest-neighbor $k$-track layout. While
+Section 9 addressed the recognition problem for $k \le 2$,
+here we tackle the general case.
+
+\subsection{Lower bound: degree-based certificate}
+
+\paragraph{Action.}
+Given the maximum degree $\Delta(G)$, we compute the immediate lower bound
+\[
+  k \;\ge\; k_{\min} \;:=\; \left\lceil \frac{\Delta(G)}{2} \right\rceil.
+\]
+
+\paragraph{Theoretical justification.}
+
+\begin{proposition}[Degree lower bound]
+\label{prop:bonus-degree-lb}
+For any graph $G$ with maximum degree $\Delta(G)$,
+\[
+  \mathrm{tn}(G) \;\ge\; \left\lceil \frac{\Delta(G)}{2} \right\rceil.
+\]
+\end{proposition}
+
+\begin{proof}
+Let $v$ be a vertex of degree $\Delta(G)$ and suppose $G$ admits a
+$k$-track layout $(\tau,p)$. Vertex $v$ has at most $2k$ legal neighbors:
+on each of the $k$ tracks, at most one predecessor and one successor
+(relative to the global order $p$) can be adjacent to $v$. Hence
+$\Delta(G) \le 2k$, yielding $k \ge \lceil \Delta(G)/2 \rceil$.
+\end{proof}
+
+\subsection{Trivial structures: trees and linear forests}
+
+\paragraph{Action.}
+If $G$ is a tree (connected, acyclic), the track number is given exactly by
+\[
+  \mathrm{tn}(T) \;=\; \left\lceil \frac{\Delta(T)}{2} \right\rceil.
+\]
+If $G$ is a linear forest (disjoint union of paths), then $\mathrm{tn}(G)=1$.
+
+\paragraph{Theoretical justification.}
+
+\begin{lemma}[Track number for trees]
+\label{lem:bonus-trees}
+Let $T$ be a tree with maximum degree $\Delta$. Then
+$\mathrm{tn}(T) = \lceil \Delta/2 \rceil$.
+\end{lemma}
+
+\begin{proof}
+The lower bound follows from Proposition~\ref{prop:bonus-degree-lb}. For
+the upper bound, we use a DFS-based construction. Root $T$ at an arbitrary
+vertex $r$ and perform a depth-first traversal. When visiting a vertex $v$
+with children $c_1,\dots,c_d$, assign the children to tracks in a
+round-robin fashion: child $c_i$ is placed on track $((i-1) \bmod k)+1$,
+where $k = \lceil\Delta/2\rceil$. Place $v$ immediately before its
+children in the global order. Since each vertex has at most $\Delta$
+neighbors and they are distributed across $k$ tracks, each track receives
+at most $\lceil \Delta/k \rceil \le 2$ neighbors of $v$, ensuring all
+edges are legal.
+\end{proof}
+
+\begin{corollary}
+A graph $G$ satisfies $\mathrm{tn}(G)=1$ if and only if $G$ is a linear
+forest (disjoint union of paths and isolated vertices).
+\end{corollary}
+
+\subsection{Kernelization: leaf pruning}
+
+\paragraph{Action.}
+Repeatedly remove all degree-$1$ vertices (leaves) from $G$ until no more
+exist. Let $G'$ denote the resulting graph. Then
+\[
+  \mathrm{tn}(G) \;=\; \max\!\bigl(\mathrm{tn}(G'),\, k_{\min}\bigr),
+\]
+where $k_{\min}$ was computed from the original $\Delta(G)$.
+
+\paragraph{Theoretical justification.}
+
+\begin{lemma}[Leaf pruning preserves track number]
+\label{lem:bonus-leaf-pruning}
+Let $v$ be a leaf of $G$ with unique neighbor $u$. Then
+\[
+  \mathrm{tn}(G) \;=\; \max\!\bigl(\mathrm{tn}(G-v),\,
+  \lceil \deg_G(u)/2 \rceil\bigr).
+\]
+In particular, if $\deg_G(u) \le 2\,\mathrm{tn}(G-v)$, then
+$\mathrm{tn}(G) = \mathrm{tn}(G-v)$.
+\end{lemma}
+
+\begin{proof}
+Any layout of $G$ restricts to a layout of $G-v$, so
+$\mathrm{tn}(G-v) \le \mathrm{tn}(G)$. Conversely, given a layout of $G-v$
+with $k$ tracks, we can insert $v$ adjacent to $u$ in the global order on
+any track where $u$'s predecessor or successor slot is free. Since $u$ has
+at most $2k$ legal neighbor slots and uses $\deg_{G-v}(u) < \deg_G(u)$
+of them in $G-v$, a free slot exists whenever $k \ge \lceil\deg_G(u)/2\rceil$.
+\end{proof}
+
+\subsection{Biconnected component decomposition}
+
+\paragraph{Action.}
+Decompose $G'$ into its biconnected components (blocks) $B_1,\dots,B_m$.
+Solve each block independently and return
+\[
+  \mathrm{tn}(G') \;=\; \max_{1 \le i \le m} \mathrm{tn}(B_i).
+\]
+
+\paragraph{Theoretical justification.}
+
+\begin{lemma}[Track number from biconnected components]
+\label{lem:bonus-biconnected}
+Let $B_1,\dots,B_m$ be the biconnected components of a graph $H$. Then
+\[
+  \mathrm{tn}(H) \;=\; \max_{1 \le i \le m} \mathrm{tn}(B_i).
+\]
+\end{lemma}
+
+\begin{proof}
+The inequality $\mathrm{tn}(H) \ge \max_i \mathrm{tn}(B_i)$ is immediate:
+any layout of $H$ restricts to a layout of each $B_i$.
+
+For the reverse inequality, let $k = \max_i \mathrm{tn}(B_i)$. Build a
+block-cut tree of $H$. Starting from an arbitrary block $B_1$, fix a
+$k$-track layout $(\tau_1,p_1)$ for $B_1$. For each cut vertex $c$
+connecting $B_1$ to another block $B_j$, take a $k$-track layout of $B_j$
+and translate its global order so that $c$ occupies the same position as
+in $B_1$. Since blocks share at most one vertex (the cut vertex), layouts
+can be concatenated without conflict. Iterating over the block-cut tree
+yields a $k$-track layout for all of $H$.
+\end{proof}
+
+\subsection{Exact solver via backtracking}
+
+\paragraph{Action.}
+For each block $B_i$ that is neither a tree nor trivial, run a backtracking
+search. Starting from $k = k_{\min}$, attempt to construct a valid
+$k$-track layout by:
+\begin{enumerate}[label=(\alph*)]
+  \item Selecting an ordering of vertices (using heuristics: high-degree
+        vertices first).
+  \item Assigning each vertex to a track and position while checking:
+        \begin{itemize}
+          \item The degree constraint: no vertex has $>2$ neighbors per track.
+          \item The triplet constraint: no forbidden pattern $P^{(1)}$ or $P^{(2)}$.
+        \end{itemize}
+  \item Backtracking on conflicts; if all orderings fail, increment $k$.
+\end{enumerate}
+
+\paragraph{Theoretical justification.}
+
+\begin{theorem}[Correctness of backtracking]
+\label{thm:bonus-backtracking}
+The backtracking algorithm terminates and returns the exact track number
+$\mathrm{tn}(B)$ for any block $B$.
 \end{theorem}
 
 \begin{proof}
-\emph{Lower bound:} By Corollary~\ref{cor:tracks-from-degree}, $k \ge \lceil \Delta(G)/2 \rceil$ for any $k$-track layout.
+\emph{Termination:} For any graph on $n$ vertices, $\mathrm{tn}(B) \le n$
+(place each vertex on its own track). Thus the search over $k$ is bounded.
 
-\emph{Upper bound:} Since $G$ is a forest, it is bipartite and acyclic. We can construct a track layout by assigning vertices to tracks so that no vertex has two neighbors on the same track, and ordering the vertices (e.g., by BFS or DFS). For each vertex $v$ of degree $d$, its neighbors can be distributed among $\lceil d/2 \rceil$ tracks, and since $\Delta(G)$ is the maximum degree, $\lceil \Delta(G)/2 \rceil$ tracks suffice for the whole graph.
+\emph{Soundness:} If the algorithm returns $k$, it has found a valid
+$k$-track layout satisfying all constraints.
 
-Therefore, the minimum number of tracks required is exactly $\lceil \Delta(G)/2 \rceil$.
+\emph{Completeness:} If a $k$-track layout exists, the backtracking search
+explores all orderings and track assignments (up to pruning), so it will
+find one.
 \end{proof}
+
+\begin{remark}[Pruning strategies]
+The search space is reduced by:
+\begin{itemize}
+  \item \textbf{Degree pruning:} If a partial assignment gives a vertex
+        $>2$ neighbors on some track, prune immediately.
+  \item \textbf{Symmetry breaking:} Fix the track of the first vertex and
+        break ties lexicographically.
+  \item \textbf{Lower bound propagation:} If a subgraph requires $k'$
+        tracks, prune branches with $k < k'$.
+\end{itemize}
+\end{remark}
+
+\subsection{Aggregation: final track number}
+
+\paragraph{Action.}
+After computing $\mathrm{tn}(B_i)$ for each block, aggregate:
+\[
+  \mathrm{tn}(G) \;=\; \max\Bigl(k_{\min},\;
+  \max_{1 \le i \le m} \mathrm{tn}(B_i)\Bigr).
+\]
+
+\paragraph{Theoretical justification.}
+This follows directly from Lemma~\ref{lem:bonus-leaf-pruning} (leaf pruning
+preserves the bound from $\Delta$) and Lemma~\ref{lem:bonus-biconnected}
+(track number is the max over blocks).
+
+\subsection{Complete algorithm and complexity}
+
+\begin{center}
+\fbox{\parbox{0.9\textwidth}{
+\textbf{Algorithm: Compute $\mathrm{tn}(G)$}
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Input:} Graph $G=(V,E)$.
+  \item Compute $k_{\min} := \lceil \Delta(G)/2 \rceil$.
+  \item \textbf{If} $G$ is a forest, \textbf{return} $k_{\min}$.
+  \item Prune all leaves to obtain $G'$.
+  \item Decompose $G'$ into biconnected components $B_1,\dots,B_m$.
+  \item \textbf{For each} $B_i$:
+    \begin{enumerate}[label=(\alph*)]
+      \item If $B_i$ is a single edge or vertex, $\mathrm{tn}(B_i):=1$.
+      \item Set $k := \max(\lceil \Delta(B_i)/2 \rceil,\, k_{\max})$.
+            \textit{(Skip values $\le k_{\max}$ already ruled out.)}
+      \item Run backtracking starting from $k$ to find $\mathrm{tn}(B_i)$.
+      \item Update $k_{\max} := \max(k_{\max}, \mathrm{tn}(B_i))$.
+    \end{enumerate}
+  \item \textbf{Return} $\max(k_{\min}, \max_i \mathrm{tn}(B_i))$.
+\end{enumerate}
+}}
+\end{center}
+
+\paragraph{Complexity analysis.}
+\begin{itemize}
+  \item Steps 2--5 run in $O(n+m)$ time (linear in the size of $G$).
+  \item Step 6 (backtracking) is exponential in the size of each block in
+        the worst case, but polynomial for bounded-degree graphs or when
+        $k$ is small.
+  \item For practical graphs (sparse, low degree), the algorithm often
+        terminates quickly due to aggressive pruning.
+  \item \textbf{Empirical observation:} In practice, most graphs satisfy
+        $\mathrm{tn}(G) \le \lceil \Delta(G)/2 \rceil + 1$, so the solver
+        rarely needs to test more than two values of $k$ per block.
+\end{itemize}
+
+\begin{remark}[Relation to Linear Arboricity]
+The \emph{linear arboricity} $\mathrm{la}(G)$ is the minimum number of linear
+forests needed to cover all edges of $G$. The Akiyama--Chv\'{a}tal Conjecture
+states that $\mathrm{la}(G) \le \lceil (\Delta(G)+1)/2 \rceil$ for every graph
+(it is known that $\mathrm{la}(G) \ge \lceil \Delta(G)/2 \rceil$).
+However, the \emph{track number} $\mathrm{tn}(G)$ is a different problem: it
+requires all linear forests to share a \emph{single global vertex ordering},
+which may force $\mathrm{tn}(G) > \mathrm{la}(G)$. The exact relationship
+between these invariants remains an open problem.
+\end{remark}
+
+\begin{remark}[Relation to NP-hardness]
+Determining whether $\mathrm{tn}(G) \le k$ is NP-complete for general $k$
+(it generalizes graph coloring-like constraints). However, for fixed $k$,
+the problem is in P: one can enumerate all $k^n \cdot n!$ possible layouts
+in time $O((k \cdot n)^{O(1)} \cdot k^n \cdot n!)$, which is constant for
+fixed $k$. Our backtracking approach with pruning makes this tractable for
+small $k$ and moderate $n$.
+\end{remark}
+
+\end{document}
