@@ -1961,9 +1961,9 @@ endpoints. Hence \textsc{2TNN-Layout} is in NP.
 \end{quote}
 
 % -----------------------------------------------------
-\section{Leyes Fundamentales sobre Tracks y Coloración}
+\section{Fundamental Laws on Tracks and Coloring}
 
-\subsection{Ley de los puntos de articulación y coloración óptima}
+\subsection{Law of Articulation Points and Optimal Coloring}
 \begin{theorem}[Coloring and Articulation Points]
 Let $G$ be a connected graph and $v$ an articulation point of $G$. If removing $v$ separates $G$ into components $C_1, C_2, \ldots, C_k$, then:
 \begin{itemize}
@@ -1973,7 +1973,7 @@ Let $G$ be a connected graph and $v$ an articulation point of $G$. If removing $
 In summary: The optimal coloring of a graph with an articulation point can be constructed by combining the optimal colorings of the parts separated by that point, respecting the color of the articulation point.
 \end{theorem}
 
-\subsection{Ley para bosques y árboles (track number)}
+\subsection{Law for Forests and Trees (Track Number)}
 \begin{theorem}[Track Number of Forests and Trees]
 A graph $G$ is a forest (i.e., acyclic) if and only if its nearest-neighbor track number is $1$. In particular, every tree admits a $1$-track nearest-neighbor layout.
 \end{theorem}
@@ -1981,7 +1981,7 @@ A graph $G$ is a forest (i.e., acyclic) if and only if its nearest-neighbor trac
 A $1$-track layout only allows paths and isolated vertices (a linear forest). Any cycle would require at least two tracks. Thus, $G$ is a forest if and only if it is $1$-track representable.
 \end{proof}
 
-\subsection{Ley para el número de tracks en función del grado máximo}
+\subsection{Law for Track Number as a Function of Maximum Degree}
 \begin{theorem}[Track Number and Maximum Degree in Forests]
 If $G$ is a forest with maximum degree $\Delta$, then its nearest-neighbor track number $k$ satisfies $k = \lceil \Delta/2 \rceil$.
 \end{theorem}
@@ -1989,7 +1989,7 @@ If $G$ is a forest with maximum degree $\Delta$, then its nearest-neighbor track
 In a $1$-track layout, each vertex can have at most two neighbors (left and right). For higher degrees, the minimum number of tracks needed is $\lceil \Delta/2 \rceil$ to avoid conflicts.
 \end{proof}
 
-\subsection{Leyes algorítmicas para reconocimiento de dos tracks}
+\subsection{Algorithmic Laws for Two-Track Recognition}
 
 % -----------------------------------------------------
 \subsection{Additional Algorithmic Laws for Two-Track Recognition}
@@ -2256,7 +2256,7 @@ time.
 
 En el contexto de este trabajo, la búsqueda eficiente de coloraciones válidas puede abordarse mediante algoritmos cuánticos, en particular Grover, adaptando la lógica de oráculo a la estructura de tracks y coloraciones discutida en las secciones anteriores.
 
-\subsection{Código base adaptado (Qiskit)}
+\subsection{Adapted Base Code (Qiskit)}
 El siguiente código implementa un oráculo de Grover para el problema de coloreo de grafos, inspirado en el notebook \texttt{grover\_max\_cut.ipynb} y adaptado a la estructura y leyes de este documento:
 
 \begin{verbatim}
@@ -2311,7 +2311,7 @@ counts = result.get_counts()
 print(counts)
 \end{verbatim}
 
-\subsection{Relación con la teoría de tracks}
+\subsection{Relation to Track Theory}
 Este oráculo implementa la verificación de coloraciones válidas, donde cada color puede interpretarse como un track. La estructura del grafo y las restricciones de adyacencia se reflejan en la lógica del oráculo, alineándose con las leyes y algoritmos desarrollados en este trabajo. Así, la integración de técnicas cuánticas refuerza y complementa los resultados teóricos y algorítmicos presentados.
 
 \bibitem{dujmovic-track-layouts}
