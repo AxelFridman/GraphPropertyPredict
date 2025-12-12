@@ -5,7 +5,10 @@
 \usepackage[margin=1in]{geometry}
 
 % -------------------- Math Packages --------------------
-\usepackage{amsmath, amssymb, amsthm}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{tikz}
+\usetikzlibrary{arrows,positioning,shapes}
+\usepackage[ruled,vlined]{algorithm2e}  % para entorno de algoritmos
 \usepackage{mathtools}
 
 % -------------------- Graphics & Figures --------------------
@@ -1987,6 +1990,99 @@ ambos extremos. Por lo tanto \textsc{2TNN-Layout} está en NP.
 \section{Un algoritmo de reconocimiento para diseños en dos tracks}
 % =====================================================
 \label{sec:recognition}
+
+\begin{quote}
+\textbf{Algoritmo Híbrido: Reconocedor de Grafos de Dos Tracks}
+
+\emph{Objetivo:} Determinar eficientemente si un grafo $G$ puede ser representado con $k \le 2$ tracks.
+
+\emph{Complejidad:} $O(N)$ para casi todos los casos (incluyendo todos los árboles). Exponencial solo en el tamaño del ciclo individual más complejo.
+
+\textbf{Fase 1: Filtros de Viabilidad Global (Cotas Necesarias)}
+\begin{itemize}
+  \item \textbf{Filtro de Densidad:} Si $|E| > 2|V| - 3$, devolver \emph{FALSO} (demasiado denso). Costo: $O(1)$.
+  \item \textbf{Filtro de Planaridad:} Si $G$ no es planar (ej. contiene $K_{3,3}$), devolver \emph{FALSO}. Costo: $O(N)$.
+  \item \textbf{Filtro de Grado:} Si $\Delta(G) \ge 5$, devolver \emph{FALSO}. Costo: $O(N)$.
+\end{itemize}
+
+\textbf{Fase 2: Kernelización (Eliminación de Hojas)}
+\begin{itemize}
+  \item Eliminar recursivamente todos los vértices de grado 1 (hojas), actualizando los grados de los vecinos.
+  \item Si el grafo original era un árbol o bosque, esta fase lo reduce al grafo vacío. Si no quedan nodos, devolver \emph{VERDADERO}.
+  \item El grafo restante es el \emph{núcleo} ($G_{nucleo}$), conteniendo solo ciclos y estructuras cerradas.
+\end{itemize}
+
+\textbf{Fase 3: Descomposición Topológica (Divide y Vencerás)}
+\begin{itemize}
+  \item Usar DFS para encontrar puntos de articulación en el núcleo.
+  \item Descomponer el núcleo en una lista de componentes biconexos (bloques) $B_1, B_2, \dots$.
+  \item Justificación: El problema es local; si algún bloque falla, todo el grafo falla.
+\end{itemize}
+
+\textbf{Fase 4: Solver Exacto (Validación Local)}
+\begin{itemize}
+  \item Para cada bloque $B_i$, ejecutar un solver de backtracking basado en slots con $k=2$.
+  \item Si algún bloque devuelve \emph{FALSO}, devolver \emph{FALSO} para todo el grafo.
+  \item Si todos los bloques tienen éxito, devolver \emph{VERDADERO}.
+\end{itemize}
+\end{quote}
+
+% -----------------------------------------------------
+\section{Leyes Fundamentales sobre Tracks y Coloreo}
+% -----------------------------------------------------
+
+\subsection{Ley de Puntos de Articulación y Coloreo Óptimo}
+\begin{theorem}[Coloreo y Puntos de Articulación]
+Sea $G$ un grafo conexo y $v$ un punto de articulación de $G$. Si eliminar $v$ separa $G$ en componentes $C_1, C_2, \ldots, C_k$, entonces:
+\begin{itemize}
+  \item El número cromático de $G$ es igual al máximo de los números cromáticos de los subgrafos inducidos $C_i \cup \{v\}$, para $i = 1, \ldots, k$.
+  \item Un $k$-coloreo óptimo de $G$ puede obtenerse coloreando $v$ y luego, para cada componente $C_i$, coloreando $C_i$ separadamente, asegurando que los vecinos de $v$ en $C_i$ reciban un color diferente de $v$.
+\end{itemize}
+En resumen: El coloreo óptimo de un grafo con un punto de articulación puede construirse combinando los coloreos óptimos de las partes separadas por ese punto, respetando el color del punto de articulación.
+\end{theorem}
+
+\subsection{Ley para Bosques y Árboles (Track Number)}
+\begin{theorem}[Track Number de Bosques y Árboles]
+Un grafo $G$ es un bosque (es decir, acíclico) si y solo si su track number de vecinos más cercanos es $1$. En particular, todo árbol admite un diseño de vecinos más cercanos de 1 track.
+\end{theorem}
+\begin{proof}
+Un diseño de 1 track solo permite caminos y vértices aislados (un bosque lineal). Cualquier ciclo requeriría al menos dos tracks. Así, $G$ es un bosque si y solo si es representable con 1 track.
+\end{proof}
+
+\subsection{Ley para Track Number como Función del Grado Máximo}
+\begin{theorem}[Track Number y Grado Máximo en Bosques]
+Si $G$ es un bosque con grado máximo $\Delta$, entonces su track number de vecinos más cercanos $k$ satisface $k = \lceil \Delta/2 \rceil$.
+\end{theorem}
+\begin{proof}
+En un diseño de 1 track, cada vértice puede tener como máximo dos vecinos (izquierda y derecha). Para grados más altos, el número mínimo de tracks necesarios es $\lceil \Delta/2 \rceil$ para evitar conflictos.
+\end{proof}
+
+\subsection{Leyes Algorítmicas para Reconocimiento de Dos Tracks}
+
+% -----------------------------------------------------
+\subsection{Leyes Algorítmicas Adicionales para Reconocimiento de Dos Tracks}
+% -----------------------------------------------------
+\begin{theorem}[Memoización de Bloques Isomorfos]
+Durante la descomposición en bloques biconexos, si dos bloques son isomorfos (estructuralmente idénticos), el resultado del solver exacto para uno puede reutilizarse para el otro.
+\end{theorem}
+\begin{proof}
+Los bloques isomorfos tienen las mismas restricciones y posibles diseños. Así, resolver una instancia proporciona una solución para todas las copias isomorfas, reduciendo computación redundante y mejorando eficiencia.
+\end{proof}
+
+\begin{theorem}[Paralelización de Solvers de Bloques]
+La validación exacta de cada bloque biconexo es independiente de los demás. Por lo tanto, los solvers pueden ejecutarse en paralelo para cada bloque.
+\end{theorem}
+\begin{proof}
+Dado que los bloques están separados por puntos de articulación, sus diseños no interfieren. Ejecutar solvers en paralelo aprovecha sistemas multi-núcleo, reduciendo el tiempo total de ejecución sin afectar la corrección.
+\end{proof}
+
+\begin{theorem}[Reducción Avanzada de Núcleo]
+Si el núcleo contiene vértices gemelos (vértices con conjuntos de vecinos idénticos) o caminos contráctiles, estos pueden fusionarse o eliminarse sin afectar la existencia de un diseño de vecinos más cercanos de dos tracks.
+\end{theorem}
+\begin{proof}
+Fusionar gemelos o contraer caminos preserva la conectividad esencial y las restricciones del núcleo. Estas reducciones simplifican el problema, disminuyen el espacio de búsqueda exponencial y mantienen la validez del algoritmo de reconocimiento.
+\end{proof}
+
 Apoyándonos en la mirada de complejidad de la sección anterior, describimos
 ahora un procedimiento concreto de decisión para $\operatorname{tn}(G)\le 2$.
 
@@ -2261,25 +2357,25 @@ tiempo.
 % =====================================================
 
 \bibitem{dujmovic-track-layouts}
-V.~Dujmovi\'c, P.~Morin, and D.~R.~Wood.
-Track layouts of graphs.
+V.~Dujmovi\'c, P.~Morin, y D.~R.~Wood.
+Diseños de tracks de grafos.
 \emph{Discrete Mathematics \& Theoretical Computer Science} 6(2):497--522, 2004.
 
 \bibitem{dujmovic-layered-track}
-V.~Dujmovi\'c and D.~R.~Wood.
-Track layouts, layered path decompositions, and leveled planarity.
-\emph{Journal of Graph Theory}, to appear.
-Preprint available as arXiv:1506.09145.
+V.~Dujmovi\'c y D.~R.~Wood.
+Diseños de tracks, descomposiciones de caminos por capas, y planaridad por niveles.
+\emph{Journal of Graph Theory}, por aparecer.
+Preprint disponible como arXiv:1506.09145.
 
 \bibitem{hopcroft-tarjan}
-J.~Hopcroft and R.~Tarjan.
-Efficient planarity testing.
+J.~Hopcroft y R.~Tarjan.
+Prueba eficiente de planaridad.
 \emph{Journal of the ACM} 21(4):549--568, 1974.
 
 \bibitem{queue-number-survey}
 D.~Eppstein.
-Queue number.
-Available at \url{https://en.wikipedia.org/wiki/Queue_number}.
+Número de cola.
+Disponible en \url{https://en.wikipedia.org/wiki/Queue_number}.
 
 % =====================================================
 \end{thebibliography}

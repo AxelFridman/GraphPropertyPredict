@@ -2292,7 +2292,7 @@ def coloring_oracle(qc, x, aux, edges, num_colors):
       qc.cx(x[i][b], aux)
       qc.cx(x[j][b], aux)
     qc.x(aux)
-    # Aquí debería ir un multi-controlled Toffoli (mct) para marcar coincidencia
+    # Here should go a multi-controlled Toffoli (mct) to mark coincidence
     qc.x(aux)
     for b in range(color_bits):
       qc.cx(x[j][b], aux)
@@ -2307,7 +2307,7 @@ qc = QuantumCircuit(*x, aux, cr)
 for reg in x:
   qc.h(reg)
 coloring_oracle(qc, x, aux[0], list(G.edges), num_colors)
-# Difusión de Grover (simplificada)
+# Grover diffusion (simplified)
 for reg in x:
   qc.h(reg)
   qc.x(reg)
@@ -2327,7 +2327,7 @@ print(counts)
 \end{verbatim}
 
 \subsection{Relation to Track Theory}
-Este oráculo implementa la verificación de coloraciones válidas, donde cada color puede interpretarse como un track. La estructura del grafo y las restricciones de adyacencia se reflejan en la lógica del oráculo, alineándose con las leyes y algoritmos desarrollados en este trabajo. Así, la integración de técnicas cuánticas refuerza y complementa los resultados teóricos y algorítmicos presentados.
+This oracle implements the verification of valid colorings, where each color can be interpreted as a track. The graph structure and adjacency constraints are reflected in the oracle logic, aligning with the laws and algorithms developed in this work. Thus, the integration of quantum techniques reinforces and complements the theoretical and algorithmic results presented.
 
 \bibitem{dujmovic-track-layouts}
 V.~Dujmovi\'c, P.~Morin, and D.~R.~Wood.
