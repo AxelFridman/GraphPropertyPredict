@@ -333,8 +333,7 @@ class GrafoGUI:
         tk.Frame(btn_frame, height=2, bg="gray").pack(fill=tk.X, pady=10)
         
         tk.Button(btn_frame, text="Explicación", command=self.mostrar_explicacion).pack(pady=5, fill=tk.X)
-        tk.Button(btn_frame, text="Animar Coloreo", command=self.animar_coloreo).pack(pady=5, fill=tk.X)
-
+        
 
         self.redibujar()
 
