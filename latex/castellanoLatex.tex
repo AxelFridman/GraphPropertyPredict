@@ -47,8 +47,8 @@
 \newtheorem{example}[theorem]{Example}
 
 % -------------------- Title Info --------------------
-\title{Diseños en tracks, patrones prohibidos y cotas de grado}
-\author{Axel Fridman}
+\title{Cotas, ideas y algoritmos para coloreo y orden en "tracks"}
+\author{Axel Fridman, Federico Agustín Tavano y Martín Ezequiel Pulitano}
 
 % =====================================================
 \begin{document}
@@ -60,7 +60,7 @@
 Estudiamos disposiciones ordenadas de un grafo sobre $k$ ``tracks'' (pistas)
 en las que las aristas están restringidas por reglas de vecinos más cercanos.
 Esta noción viene de la formulación del Investigathon en términos de patrones
-coloreados prohibidos sobre tríos de vértices. Hacemos precisa la
+coloreados prohibidos sobre triplas de vértices. Hacemos precisa la
 correspondencia entre las dos formalizaciones, definimos los
 \emph{diseños triplemente-legales en $k$ tracks} y después investigamos
 cuántos tracks (es decir, ``colores'') hacen falta para un grafo dado.
@@ -102,7 +102,7 @@ compuesto por
 \end{itemize}
 Escribimos $x<y$ si y sólo si $p(x)<p(y)$ y pensamos a todos los vértices
 puestos de izquierda a derecha de acuerdo a $p$.
-\end{definition} 
+\end{definition}
 Un ejemplo se muestra en la Figura~\ref{fig:tracks-basic}.
 \begin{figure}[ht]
   \centering
@@ -144,15 +144,15 @@ ordenado por el $p(\cdot)$ creciente a lo largo de ese track.
 Dado un diseño en $k$ tracks $(\tau,p)$, un vértice $v\in V$ y un track $t$,
 definimos:
 \begin{align*}
-  \operatorname{pred}_t(v) 
+  \operatorname{pred}_t(v)
   &:= \text{el vértice en $V_t$ con mayor $p(\cdot)$ estrictamente menor que $p(v)$ (si existe)},\\
-  \operatorname{succ}_t(v) 
+  \operatorname{succ}_t(v)
   &:= \text{el vértice en $V_t$ con menor $p(\cdot)$ estrictamente mayor que $p(v)$ (si existe)}.
 \end{align*}
 Si un vértice así no existe, el predecesor/sucesor se dice
 ``inexistente''. Intuitivamente, son los vecinos más cercanos de $v$ sobre
 el track $t$ a la izquierda/derecha en el orden global.
-\end{definition} 
+\end{definition}
 Ver la Figura~\ref{fig:predsucc} para una vista pictórica sobre un solo track.
 \par\vspace{1em}
 
@@ -188,7 +188,7 @@ Ver la Figura~\ref{fig:predsucc} para una vista pictórica sobre un solo track.
 \end{figure}
 
 
-\begin{definition}[Conjunto de vecinos legales y grafo anfitrión]
+\begin{definition}[Conjunto de vecinos legales y grafo de vecindad]
 Dado $(\tau,p)$, el \emph{conjunto de vecinos legales} de $v\in V$ es
 \[
   N_{\mathrm{legal}}(v)
@@ -196,7 +196,7 @@ Dado $(\tau,p)$, el \emph{conjunto de vecinos legales} de $v\in V$ es
   \bigl\{\operatorname{pred}_t(v), \operatorname{succ}_t(v)
         : t=1,\dots,k\bigr\}\setminus\{\text{inexistente}\}.
 \]
-El \emph{grafo anfitrión} correspondiente $H(\tau,p)$ sobre el conjunto de
+El \emph{grafo de vecindad} correspondiente $H(\tau,p)$ sobre el conjunto de
 vértices $V$ tiene conjunto de aristas
 \[
   E\bigl(H(\tau,p)\bigr)
@@ -272,7 +272,7 @@ si existe un diseño ordenado en $k$ tracks $(\tau,p)$ de $V$ tal que
 \[
   E \subseteq E\bigl(H(\tau,p)\bigr),
 \]
-es decir, cada arista de $G$ es una arista legal en el grafo anfitrión.
+es decir, cada arista de $G$ es una arista legal en el grafo de vecindad.
 Equivalentemente,
 \[
   \forall v\in V,\quad N_G(v) \subseteq N_{\mathrm{legal}}(v).
@@ -280,8 +280,8 @@ Equivalentemente,
 El menor $k$ con esta propiedad (si existe) es el \emph{número de tracks de
 vecinos más cercanos} de $G$.
 \end{definition}
-La Figura~\ref{fig:k1-linear-forest} ilustra un grafo anfitrión típico
-cuando $k=1$. La Figura~\ref{fig:k2-host-example} muestra un grafo anfitrión
+La Figura~\ref{fig:k1-linear-forest} ilustra un grafo de vecindad típico
+cuando $k=1$. La Figura~\ref{fig:k2-host-example} muestra un grafo de vecindad
 típico cuando $k=2$.
 
 
@@ -302,7 +302,7 @@ típico cuando $k=2$.
     \draw (w1) -- (w2) -- (w3);
     \draw (w5) -- (w6) -- (w7);
   \end{tikzpicture}
-  \caption{Con un solo track, el grafo anfitrión es una unión disjunta de caminos y vértices aislados (un bosque lineal).}
+  \caption{Con un solo track, el grafo de vecindad es una unión disjunta de caminos y vértices aislados (un bosque lineal).}
   \label{fig:k1-linear-forest}
 \end{figure}
 
@@ -340,7 +340,7 @@ típico cuando $k=2$.
     \draw (v5) -- (v6);
 
   \end{tikzpicture}
-  \caption{Con dos tracks, el grafo anfitrión puede tener tramos tipo camino en cada track más aristas cruzadas entre vecinos más cercanos en el otro track.}
+  \caption{Con dos tracks, el grafo de vecindad puede tener tramos tipo camino en cada track más aristas cruzadas entre vecinos más cercanos en el otro track.}
   \label{fig:k2-host-example}
 \end{figure}
 
@@ -348,7 +348,7 @@ típico cuando $k=2$.
 \begin{remark}[Qué significa realmente $k=1$]
 \label{rem:what-k1-means}
 Cuando $k=1$, todo vértice tiene a lo sumo un predecesor y un sucesor,
-de modo que el grafo anfitrión $H(\tau,p)$ es un subgrafo de un camino
+de modo que el grafo de vecindad $H(\tau,p)$ es un subgrafo de un camino
 simple. Entonces cualquier grafo representable por vecinos más cercanos
 en un solo track es una unión disjunta de caminos y vértices aislados
 (un \emph{bosque lineal}). Esto va a ser importante cuando discutamos
@@ -361,17 +361,17 @@ cuándo es posible ``menos de dos colores'' (tracks).
 Cuando $k=2$, cada vértice puede tener a lo sumo dos vecinos legales en su
 propio track (un predecesor y un sucesor) y a lo sumo dos vecinos legales
 en el otro track (de nuevo, un predecesor y un sucesor allí). Entonces
-cada vértice en el grafo anfitrión $H(\tau,p)$ tiene grado a lo sumo $4$,
+cada vértice en el grafo de vecindad $H(\tau,p)$ tiene grado a lo sumo $4$,
 y $H(\tau,p)$ se puede ver como dos capas tipo camino (una por track) con
 aristas cruzadas adicionales entre vecinos más cercanos de la otra capa,
 como en la Figura~\ref{fig:k2-host-example}. En particular, cualquier
 grafo representable por vecinos más cercanos en $2$ tracks es un subgrafo
-de un grafo anfitrión planar de este tipo ``escalera''. Esto será importante
+de un grafo de vecindad planar de este tipo ``escalera''. Esto será importante
 cuando discutamos cuándo es posible ``menos de tres colores'' (tracks).
 \end{remark}
 
 % =====================================================
-\section{De patrones coloreados prohibidos a restricciones en tríos}
+\section{De patrones coloreados prohibidos a restricciones en triplas}
 % =====================================================
 
 La formulación del Investigathon usa patrones \emph{coloreados} prohibidos
@@ -512,11 +512,11 @@ Así, hay una correspondencia uno a uno entre:
   \item diseños ordenados en $k$ tracks $(\tau,p)$.
 \end{itemize}
 
-\subsection{Formulación como restricción en tríos}
+\subsection{Formulación como restricción en triplas}
 
 Reexpresamos ahora la evitación de $P^{(1)}$ y $P^{(2)}$ de forma compacta.
 
-\begin{lemma}[Patrones coloreados vs.\ restricción de tríos]
+\begin{lemma}[Patrones coloreados vs.\ restricción de triplas]
 \label{lem:patterns-triplet-equivalence}
 Sea $G=(V,E)$ un grafo y sea $(\tau,p)$ un diseño ordenado en $k$ tracks
 con el orden asociado $<$ y la partición inducida $\mathcal{S}$ como arriba.
@@ -603,8 +603,8 @@ legales, uno usando menos colores que el otro.
     \node[fill=red!20]   (z3) at (4,-3.2) {$z$};
     \draw[thick] (x3) .. controls +(0,-0.7) and +(0,-0.7) .. (z3);
   \end{tikzpicture}
-  \caption{Arriba: un triple prohibido donde $y$ comparte track (color) con $x$. 
-  Medio: un triple legal donde $x$ comparte track (color) con $z$. 
+  \caption{Arriba: un triple prohibido donde $y$ comparte track (color) con $x$.
+  Medio: un triple legal donde $x$ comparte track (color) con $z$.
   Abajo: un triple legal donde el vértice del medio está en un tercer track.}
   \label{fig:triplet-legal}
 \end{figure}
@@ -615,7 +615,7 @@ La representabilidad por vecinos más cercanos es una condición
 más cercanos, cada arista debe ser entre vecinos más cercanos en algún track;
 en un diseño triplemente-legal sólo prohibimos ciertos patrones coloreados
 en triples. En la próxima sección mostramos que los diseños de vecinos más
-cercanos satisfacen automáticamente la restricción de tríos.
+cercanos satisfacen automáticamente la restricción de triplas.
 \end{remark}
 % =====================================================
 \section{Número cromático vs.\ ``colores'' basados en tracks}
@@ -728,7 +728,7 @@ el mismo conjunto de labels de track.
 \end{figure}
 
 \begin{remark}[Cuándo alcanza con menos de $2$ tracks]
-De la Sección~\ref{sec:basic-setup}, un grafo anfitrión con $1$ track es
+De la Sección~\ref{sec:basic-setup}, un grafo de vecindad con $1$ track es
 siempre una unión disjunta de caminos y vértices aislados (un bosque lineal).
 Entonces
 \[
@@ -768,13 +768,13 @@ en un solo track.
 \end{figure}
 
 % =====================================================
-\section{Los diseños de vecinos más cercanos cumplen la restricción de tríos}
+\section{Los diseños de vecinos más cercanos cumplen la restricción de triplas}
 % =====================================================
 
 Ahora conectamos la condición de vecinos más cercanos con la restricción
-de tríos del Lema~\ref{lem:patterns-triplet-equivalence}.
+de triplas del Lema~\ref{lem:patterns-triplet-equivalence}.
 
-\begin{lemma}[Restricción de tríos para diseños de vecinos más cercanos]
+\begin{lemma}[Restricción de triplas para diseños de vecinos más cercanos]
 \label{lem:triplet}
 Sea $(\tau,p)$ un diseño ordenado en $k$ tracks de un grafo $G=(V,E)$ y
 supongamos que $G$ es representable por vecinos más cercanos en $k$ tracks
@@ -939,7 +939,7 @@ Renombramos $a,b,c,d$ de forma que
 \]
 Como $H$ es completo, cada par entre $\{a,b,c,d\}$ es una arista.
 
-Usando el Lema~\ref{lem:triplet}, aplicamos la restricción de tríos a todos
+Usando el Lema~\ref{lem:triplet}, aplicamos la restricción de triplas a todos
 los triples $(x,y,z)$ con $x<y<z$ donde $\{x,z\}$ es una arista (siempre
 cierto en $K_4$). Los triples relevantes y sus consecuencias son:
 \begin{align}
@@ -1176,7 +1176,7 @@ vértices. Esto coincide con la cota extremal conocida para grafos
 outerplanos.
 
 Trabajamos respecto de un diseño fijo en $2$ tracks $(\tau,p)$ y su grafo
-anfitrión $H(\tau,p)$.
+de vecindad $H(\tau,p)$.
 
 \begin{definition}[Grado hacia la izquierda]
 Dado un orden lineal $v_1,\dots,v_n$ de $V(G)$ inducido por $p$, el
@@ -1206,7 +1206,7 @@ para todo vértice $v$.
 
 \begin{proof}
 Fijamos $v$ y un track $t$. Por definición, el único candidato a vecino a la
-izquierda de $v$ en el track $t$ que puede ser legal en el grafo anfitrión
+izquierda de $v$ en el track $t$ que puede ser legal en el grafo de vecindad
 es $\operatorname{pred}_t(v)$ (si existe). No pueden existir dos vecinos
 distintos $x,y$ en el track $t$ con $p(x)<p(y)<p(v)$ y ambos adyacentes a
 $v$, porque sólo el más cercano a la izquierda puede ser un predecesor
@@ -1229,7 +1229,7 @@ $2n-3$ aristas.
 
 \begin{proof}
 Sea $(\tau,p)$ un diseño en $2$ tracks y sea $H=H(\tau,p)$ su grafo
-anfitrión. Como $G$ es subgrafo de $H$, alcanza con demostrar
+de vecindad. Como $G$ es subgrafo de $H$, alcanza con demostrar
 $|E(H)|\le 2n-3$.
 
 Escribimos $V=\{v_1,\dots,v_n\}$ en orden creciente de $p$, de forma que
@@ -1317,7 +1317,7 @@ un grafo de este tipo de izquierda a derecha en el orden global.
     }
 
   \end{tikzpicture}
-  \caption{Un grafo anfitrión extremal en $2$ tracks con $n=6$ vértices:
+  \caption{Un grafo de vecindad extremal en $2$ tracks con $n=6$ vértices:
   un camino $v_1-\dots-v_5$ en el track~1 y un único vértice $w$ en el
   track~2, unido a todos los $v_i$. Esto tiene $(6-2)+(6-1)=9=2n-3$ aristas.}
   \label{fig:two-track-extremal}
@@ -1436,7 +1436,7 @@ $\operatorname{pred}_1(v_1)$ como $\operatorname{pred}_2(v_1)$ son inexistentes.
 Los únicos vecinos legales posibles de $v_1$ son sus dos sucesores,
 $\operatorname{succ}_1(v_1)$ y $\operatorname{succ}_2(v_1)$, a lo sumo uno en
 cada track. Entonces $|N_{\mathrm{legal}}(v_1)|\le 2$, y como $G$ es un
-subgrafo del grafo anfitrión, $\deg_G(v_1)\le |N_{\mathrm{legal}}(v_1)|\le 2$.
+subgrafo del grafo de vecindad, $\deg_G(v_1)\le |N_{\mathrm{legal}}(v_1)|\le 2$.
 
 Simétricamente, $v_n$ no tiene vértices a la derecha en ningún track, entonces
 $\operatorname{succ}_1(v_n)$ y $\operatorname{succ}_2(v_n)$ son inexistentes,
@@ -1716,10 +1716,10 @@ esto muestra que su número de tracks de vecinos más cercanos es exactamente $2
     \end{scope}
 
   \end{tikzpicture}
-  \caption{Un camino $v_1-\cdots-v_8$ con una arista extra $\{v_3,v_7\}$. 
+  \caption{Un camino $v_1-\cdots-v_8$ con una arista extra $\{v_3,v_7\}$.
   Izquierda: el diseño natural en $1$ track del camino; la arista extra
   (roja, punteada) salta varios vértices y no es una arista de vecinos más
-  cercanos. 
+  cercanos.
   Derecha: moviendo $v_3$ y $v_7$ al track~2, obtenemos un diseño en $2$
   tracks en el que la arista extra (roja sólida) pasa a ser legal mientras
   que todas las aristas del camino siguen siendo legales.}
@@ -1827,7 +1827,7 @@ aislados, luego planar.
 \medskip
 \noindent\emph{Caso $k=2$: reducción a grafos anfitriones.}
 Fijamos un diseño en $2$ tracks $(\tau,p)$ sobre $V$ y sea $H(\tau,p)$ su
-grafo anfitrión con todas las aristas legales. Como $G$ es un subgrafo de
+grafo de vecindad con todas las aristas legales. Como $G$ es un subgrafo de
 $H(\tau,p)$, alcanza con ver que $H(\tau,p)$ es planar.
 
 Ponemos los vértices sobre una recta horizontal en el orden global
@@ -1879,7 +1879,7 @@ planar usado en la prueba.
     \end{scope}
 
   \end{tikzpicture}
-  \caption{Un embedding planar esquemático para un grafo anfitrión en $2$
+  \caption{Un embedding planar esquemático para un grafo de vecindad en $2$
   tracks: las aristas en el track~1 y las aristas cruzadas hacia la derecha
   se dibujan arriba de la recta, mientras que las aristas en el track~2 y las
   cruzadas hacia la izquierda se dibujan abajo.}
@@ -2023,7 +2023,7 @@ cercanos en $2$ tracks. Tomamos entonces
 como un \emph{SÍ automático}. Esto se chequea en tiempo $O(1)$ por componente.
 
 \paragraph{Corte 1: cota superior de densidad de aristas.}
-Por el Teorema~\ref{thm:edge-bound-2tracks}, todo grafo anfitrión en $2$
+Por el Teorema~\ref{thm:edge-bound-2tracks}, todo grafo de vecindad en $2$
 tracks sobre $n_H$ vértices tiene a lo sumo $2n_H-3$ aristas. Por lo tanto,
 cualquier componente con $m_H > 2n_H-3$ no puede tener
 $\operatorname{tn}(H)\le 2$.
@@ -2246,7 +2246,9 @@ Los pasos (1)--(2f) y la reducción al núcleo (2g) en conjunto toman
 \]
 tiempo.
 
-
+\section{Conclusiones}
+Nuestro repositorio, actualmente en desarrollo, se encuentra disponible en \url{https://github.com/AxelFridman/GraphPropertyPredict/tree/main}.
+Allí se incluyen el código fuente y los resultados del benchmark que estamos construyendo. Contamos con más de 30000 grafos pertenecientes a distintas familias, los cuales utilizamos para la evaluación, comparación de velocidad y verificación de la correctitud de nuestras distintas propuestas.
 % =====================================================
 \begin{thebibliography}{9}
 % =====================================================
@@ -2639,20 +2641,13 @@ Observamos empíricamente que en la práctica
 $\operatorname{tn}(G) \le \lceil \Delta(G)/2 \rceil + 1$ para la mayoría de grafos,
 por lo que raramente probamos más de dos valores de $k$ por bloque.
 
-\textbf{Nota:} La Conjetura de Akiyama--Chvátal establece que la
-\emph{arboricidad lineal} satisface $\operatorname{la}(G) \le \lceil (\Delta(G)+1)/2 \rceil$
-(se sabe que $\operatorname{la}(G) \ge \lceil \Delta(G)/2 \rceil$).
-Sin embargo, el track number $\operatorname{tn}(G)$ es un problema distinto:
-requiere que \emph{todos} los bosques lineales compartan un orden global único,
-lo cual puede forzar $\operatorname{tn}(G) > \operatorname{la}(G)$. La relación
-exacta entre ambos invariantes sigue siendo un problema abierto.
 
 \paragraph{Reducción a SAT.}
 El problema de evitar patrones prohibidos es equivalente a satisfacer un
 conjunto de cláusulas lógicas. Para cada arista $\{u,v\}$ y cada posible
 asignación de tracks y posiciones relativas, codificamos las restricciones
 de vecinos más cercanos como cláusulas. Un SAT solver moderno puede resolver
-instancias de tamaño moderado ($n \le 30$) en segundos.
+instancias de tamaño moderado ($n \le 30$) en segundos. Si pudieramos reducir SAT a este problema entonces seria NP completo, pero todavia no nos salio esa demostracion.
 
 % -----------------------------------------------------
 \subsection{Agregación de resultados}
@@ -2686,17 +2681,17 @@ Resumimos el procedimiento completo.
 \begin{enumerate}[leftmargin=2em]
   \item \textbf{Cota global:}
         $k_{\text{global}} \gets \lceil \Delta(G)/2 \rceil$.
-        
+
   \item \textbf{Atajo árboles:}
         Si $G$ es un bosque (sin ciclos), retornar $k_{\text{global}}$.
-        
+
   \item \textbf{Kernelización:}
         $G_{\text{core}} \gets \textsc{PodaHojas}(G)$.
         Si $G_{\text{core}} = \emptyset$, retornar $k_{\text{global}}$.
-        
+
   \item \textbf{Descomposición:}
         $(B_1, \dots, B_m) \gets \textsc{BloquessBiconexos}(G_{\text{core}})$.
-        
+
   \item \textbf{Solver local:}
         $k_{\text{max}} \gets 0$.\\
         \textbf{Para cada} $B_i$:
@@ -2713,7 +2708,7 @@ Resumimos el procedimiento completo.
               \item Si no: $k \gets k + 1$.
             \end{itemize}
         \end{enumerate}
-        
+
   \item \textbf{Agregación:}
         Retornar $\max(k_{\text{global}}, k_{\text{max}})$.
 \end{enumerate}
@@ -2729,9 +2724,7 @@ Resumimos el procedimiento completo.
   \item \textbf{Observación empírica:} En la práctica, para la mayoría de
         grafos se cumple $\operatorname{tn}(G) \le \lceil \Delta(G)/2 \rceil + 1$,
         por lo que el solver raramente necesita probar más de dos valores
-        de $k$ por bloque. Conjeturamos que esta cota es válida en general,
-        pero no está demostrada (notar que la Conjetura de Akiyama--Chvátal
-        es sobre arboricidad lineal, un problema relacionado pero distinto).
+        de $k$ por bloque.
 \end{itemize}
 
 \end{document}
